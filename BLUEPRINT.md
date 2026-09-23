@@ -34,6 +34,9 @@ the headcount do not, and those are where the money is.
 | 22 | Assumed a split architecture could limit classification | §8: **it cannot** | The Commission's draft guidance assesses agentic systems together, explicitly to prevent that circumvention. |
 | 20 | AI Act treated as one 2026 deadline | §8: **two dates, and only one moved** | High-risk duties slipped to Dec 2027; the workplace emotion-recognition ban has applied since Feb 2025 and is enforceable now. |
 | 17 | "≥65% OSWorld" as a GA target | §9: score **completion**, not partial credit | Vendor-quoted ~80% is partial credit; binary completion at publication was ~20%. Four-times misreading if taken at face value. |
+| 23 | Employee monitoring treated as a compliance burden to be carried | §1, §8: the **employer-facing product is not built** | WP249 §5.4.1 names "screen capturing (either randomly or at set intervals)" and webcam collection as disproportionate, and holds the employer "very unlikely to have a legal ground under legitimate interest" — the only basis available, since employment consent is not freely given. There is no paperwork that fixes this, so the manager view is absent rather than deferred. |
+| 24 | "Needs a DPIA" | §8: **mandatory via Art. 35(1) + WP248, and a charge on its own** | Five WP248 criteria are hit and WP248's worked example is this product; France's and Germany's Art. 35(4) blacklists catch it independently. A missing DPIA was charged as its own breach in CNIL SAN-2024-021 and the Garante's Regione Lombardia decision. It ships with v1. |
+| 25 | Capture policy treated as a UX choice | §8: **continuity is what gets punished, and audio is the heavier half** | Across 25 decisions the line is constant-versus-invoked, not which technology. Time Doctor drew €40,000 for screenshots every 3–15 minutes the worker could not disable; three AEPD fines and La Samaritaine's €100,000 turned on the audio layer alone, and the Audiencia Nacional requires "justificación reforzada" for voice. So: session-scoped capture, push-to-talk, and no inter-key timing anywhere — ICO treats typing rhythm as biometric data. |
 
 Everything else — the Rust core, Tauri overlay, typed action schema, hardware kill switch, bare-metal
 device farm, coordinate normalisation, audit trail — is kept, and in several places tightened.
@@ -61,6 +64,12 @@ next primitive action, and an overlay that shows what the agent is about to do b
   recognition covers behavioural biometrics — voice and keystroke dynamics among them — while analysis
   of written text sits outside it. Transcribe, then analyse. It costs nothing to build this way and
   cannot be retrofitted once a prosody feature exists.
+- **An employer's monitoring tool.** There is no manager view, no fleet dashboard, no per-user export
+  to anyone but the operator. The transcript belongs to the person at the keyboard. This is not
+  squeamishness: the EU guidance on employee monitoring rules out screen capture and webcam collection
+  by name, and the only legal basis available to an employer is the one that guidance says fails (§8).
+  The employer-facing version of this product cannot be lawfully deployed in the EU, so it is not on a
+  roadmap — it is absent.
 - **An iOS product.** See §2.
 
 ---
@@ -317,15 +326,119 @@ Architectural response, not a red-team finding:
 
 ## 8. Privacy and employment law
 
-This gates EU deployment harder than SOC 2 does, and the original plan does not mention it.
+This gates EU deployment harder than SOC 2 does, and the original plan does not mention it. Three
+research passes have now been run against primary sources: regulator guidance, the national Art. 35(4)
+blacklists, and twenty-five published enforcement decisions. The conclusion is sharper than "get a
+DPIA" — one whole version of this product turns out to be unbuildable, and it is worth knowing that
+before someone sells it.
 
-- Continuous capture of an employee's screen and voice is **employee monitoring**. In the EU it needs a
-  lawful basis, a **DPIA**, data minimisation (which is what §7's redaction buys you), and in Germany and
-  France **consultation with the works council before deployment** — a process measured in months, not
-  a checkbox.
-- **Voice** adds a second category. Several US states regulate voiceprints specifically; "we only stream,
-  never store" must be architecturally true and documented, because it is the claim that keeps voice out
-  of biometric scope.
+### The line that decides everything else: whose record is it
+
+Every finding below turns on one distinction. An agent **the operator invokes, whose transcript the
+operator holds**, is a tool. The same capture **running ambiently and reporting to an employer** is
+employee monitoring — and the EU guidance on employee monitoring rules out this exact feature set by
+name. WP249 §5.4.1 lists "screen capturing (either randomly or at set intervals)" and "enabling
+webcams and collecting the footage thereof", and holds that "the processing involved in such
+technologies are disproportionate and the employer is very unlikely to have a legal ground under
+legitimate interest". Consent cannot rescue it: in an employment relationship consent is not freely
+given (WP249 §6.2, Recital 43), so legitimate interest is the only candidate basis, and legitimate
+interest is the basis WP249 says fails.
+
+So the employer-facing Orbit is not a harder sale requiring more paperwork. It is a product we do not
+build: no manager view, no fleet dashboard, no per-user aggregate export, no silent install. The
+transcript belongs to the person at the keyboard. That is the same kind of line as the emotion refusal
+in §1 — an absence in the architecture, not a setting that defaults to off.
+
+The Dutch courts have already priced the other side of this. In *Chetu* (Rb. Zeeland-West-Brabant,
+**28 September 2022**) an employee was required to stay logged in, share his screen and keep his camera
+on for the whole working day; he objected — "I don't feel comfortable being monitored for 9 hours a
+day" — and was dismissed for insubordination. The court held the instruction itself conflicted with his
+right to respect for private life and the dismissal was unlawful. The employer could not lawfully give
+the instruction that an employer-facing Orbit would exist to serve.
+
+### The DPIA is mandatory, and its absence is a charge in its own right
+
+Not through Art. 35(3)(c) — that limb is about publicly accessible areas. It bites through **Art. 35(1)
+plus the WP248 rev.01 criteria**, of which this product hits five: systematic monitoring; vulnerable
+data subjects (WP248 names employees expressly); sensitive or highly personal data; innovative use of
+new technology; evaluation or scoring. WP248's own worked example — a company systematically monitoring
+employee activities "including the monitoring of the employees['] work station" — is listed as
+DPIA-required. Two national Art. 35(4) blacklists catch it independently: France's "surveiller de
+manière **constante** l'activité des employés", and the German DSK's items 8 and 13.
+
+Regulators charge the missing DPIA on its own: it was one of six grounds in CNIL **SAN-2024-021** and a
+ground in the Garante's **Regione Lombardia** decision. It is a free finding, so the DPIA ships with
+v1 rather than after the first enterprise deal.
+
+### Always-on audio reaches Art. 9 by two routes
+
+Voice used for identification is biometric data (Art. 4(14) with Art. 9(1)). Separately, **C-184/20**
+(Grand Chamber) holds that data which indirectly reveal special-category information "by means of an
+intellectual operation involving comparison or deduction" are *themselves* special-category data — so a
+transcript that happens to reveal a health condition or a trade-union meeting is Art. 9 material
+regardless of intent. This is the legal form of the §1 refusal: transcribe, act, discard; never
+speaker-model, never retain the waveform.
+
+### What the enforcement record actually punishes
+
+Twenty-five decisions, and they converge on six things. They are worth reading as a design
+specification, because each one names a property Orbit can either have or not have.
+
+1. **Continuity, not technology, is the trigger.** CNIL's 9 July 2026 guidance: "une surveillance
+   constante est excessive". ICO: "Continuous audio and video recording can be highly intrusive and you
+   are unlikely to be able to justify it in most circumstances." The €40,000 Time Doctor fine
+   (SAN-2024-021, 19 Dec 2024) turned on screenshots every 3–15 minutes in a "silent" mode the worker
+   could not switch off; the €20,000 Uniontrad fine (SAN-2019-006) on a camera that filmed without
+   interruption. A tool that captures **on invocation** survives where the same tool running **always**
+   does not. Orbit's session-scoped capture is not a nicety — it is the whole defence.
+2. **Audio is treated as the heavier intrusion.** La Samaritaine drew €100,000 (SAN-2025-008) largely
+   because the hidden cameras carried microphones. The AEPD has fined at least three times on the audio
+   layer alone (€30,000; €6,000 upheld by the Audiencia Nacional; €4,000 Bodense, Aug 2026), and the
+   Audiencia Nacional's formula is that voice recording "exige una justificación reforzada" — signage
+   that covers video does not cover audio. ICO's position is that audio is off by default. Push-to-talk
+   with a visible indicator is therefore the only defensible voice design; an always-hot microphone is
+   not a UX choice we get to make.
+3. **Emotion inference is now enforced, not merely prohibited.** The Garante's **Myndoor** warning
+   (provv. n. 342, 14 May 2026) is the first European action applying **AI Act Art. 5(1)(f)** — a
+   Slack/Teams plug-in doing AI semantic analysis of employee chat to estimate stress. It was warned
+   even though workers opted in and the employer saw only weekly aggregates of ten or more users, partly
+   because LLM outputs "non siano sempre trasparenti, spiegabili o verificabili". Aggregation and
+   consent do not launder it. This is the single most directly threatening precedent for a product that
+   sees screen and hears voice.
+4. **Keystroke dynamics are behavioural biometrics.** ICO treats typing rhythm as biometric data where
+   it identifies the person. Orbit therefore records *that* it typed and how many characters — never
+   inter-key timings, and never the content beyond the length already fixed in `narrate()`.
+5. **Retention granularity is a separate attack surface, and is where regulators now win.** The one
+   Amazon ground that survived appeal was Art. 5(1)(c) on blanket 31-day retention of every indicator.
+   Regione Lombardia fell on 90-day email metadata and 365-day proxy logs; Sicuritalia on six-month
+   metadata; ITAS Mutua on five-year backups. Each retained data type needs its own justified period,
+   and the activity log's default must be short with a zero option.
+6. **Italy adds a gate that is not a privacy gate at all.** Art. 4 L. 300/1970 requires a prior union
+   agreement or labour-inspectorate authorisation for any instrument from which remote monitoring may
+   derive — and the Garante keeps finding that *security* tooling (SIEM, proxies, mail backup) falls
+   inside it once it traces individual activity. The ARSAC decision goes further: some monitoring is
+   unlawful **even with** a collective agreement.
+
+One correction to the received version of this story: the Amazon France Logistique fine is routinely
+cited as €32m for employee surveillance. The **Conseil d'État cut it to €15m on 23 December 2025**
+(n° 492830) and annulled every Art. 6 finding on the productivity indicators. Citing the old number is
+now a tell that the deck was not updated.
+
+### Germany and France are gates with calendars, not paperwork
+
+**Germany.** The works council holds a hard veto under BetrVG §87(1) no. 6, enforceable through the
+Einigungsstelle, plus AI-specific rights added in 2021 (§80(3) s.2, §90(1) no. 3, §95(2a)). After
+**C-34/21** (30 March 2023) §26(1) BDSG is on very shaky ground as an Art. 88 "more specific rule";
+§26 is textually unchanged as at 23 September 2026 and no Beschäftigtendatenschutzgesetz is in force.
+Plan for a co-determination negotiation measured in months.
+
+**France.** CNIL's fiche of **9 July 2026** sets three cumulative conditions — justified and
+proportionate, CSE consultation at 50+ employees (L. 2312-38, L. 2312-8 II 4°), and prior information
+of workers (L. 1222-4, which makes undisclosed collection unlawful on its own). The same fiche gives
+keyloggers on a teleworker as its worked example of a prohibited device.
+
+### The AI Act, unchanged from the last revision
+
 - The **EU AI Act**, verified against the Commission's own texts: the high-risk obligations covering
   employment monitoring — including the duty to inform workers and their representatives before the
   system goes into service — were **pushed to 2 December 2027** by the 2026 omnibus. That is about
@@ -358,11 +471,13 @@ This gates EU deployment harder than SOC 2 does, and the original plan does not 
 - **The wellbeing framing does not survive either.** The health-and-safety exception covers life and
   health, not property or fraud, and general monitoring of stress at work is named as not permitted.
   "Burnout detection" is a prohibited feature wearing a kind face.
-- **Design consequences, priced in now rather than retrofitted:** session-scoped capture (agent sees the
-  screen only while invoked, never ambiently), a visible indicator whenever capture is live, per-user
-  data export and deletion, regional data residency, and customer-controlled retention with a zero option.
 
----
+- **Design consequences, priced in now rather than retrofitted:** session-scoped capture (the agent sees
+  the screen only while invoked, never ambiently), a visible indicator whenever capture or the
+  microphone is live, push-to-talk rather than an always-hot mic, no inter-key timing anywhere in the
+  stack, the transcript held by the operator and not exportable per-user to an employer, per-data-type
+  retention with a justified period and a zero option, per-user export and deletion, regional data
+  residency, and a DPIA written before the first paying deployment rather than after it.
 
 ## 9. Evaluation
 
@@ -515,7 +630,8 @@ and a screenshot of the redaction mask over a password field.
 |---|---|
 | §4 models, coordinates, caching · §6 cost · §9 benchmarks | **Verified** against vendor documentation and the benchmark's own paper and board, September 2026 |
 | §8 EU AI Act | **Verified** against Commission guidance and consolidated Article text — with one caveat: the Official Journal site was unreachable during the check, so the consolidation was corroborated against Commission PDFs rather than read from the OJ. Pull the OJ text before this goes to counsel. |
-| §8 GDPR, works councils, US state law, enforcement history | **NOT verified.** No DPIA triggers, no BetrVG/CSE specifics, no BIPA analysis, no enforcement precedents. Written from my own knowledge only. |
+| §8 GDPR, works councils, enforcement history | **Verified**, September 2026: WP248 rev.01 and WP249 read directly, the French and German Art. 35(4) blacklists, the CNIL fiche of 9 July 2026, and 25 published decisions (CNIL, Garante, AEPD, ICO, AP, HmbBfDI, ECtHR, Conseil d'État, Rb. Zeeland-West-Brabant) traced to Légifrance, garanteprivacy.it, ico.org.uk, rechtspraak.nl and the Court's own factsheet. Amounts marked here are the ones the primary source states; a handful of Garante fine amounts rest on secondary reporting and are not quoted. |
+| §8 US state law (BIPA, wiretap, voiceprints) | **NOT verified.** Research in flight at the time of writing. No BIPA analysis, no two-party-consent analysis for the voice path. |
 | **§2 platform permissions** | **NOT verified, and the most likely to reshape the plan.** macOS TCC and MDM pre-grant, Windows UIPI and the secure desktop, Wayland portals, Android policy, iOS feasibility — all from my own knowledge. **Re-check this first.** |
 
 **A note on sourcing, learned the hard way during this review.** Fabricated leaderboards are in
