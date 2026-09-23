@@ -1,0 +1,51 @@
+<!doctype html>
+<!-- No theme stamped here: the overlay follows the desktop it floats over. A dark card pasted on a
+     white document is a foreign object, and this thing already has to earn its place on screen. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Orbit Overlay</title>
+    <!--
+      THE DOT, AND THE CARD IT BECOMES.
+
+      Idle, this is a 96px dot that ignores the mouse — the operator's screen is theirs, and an
+      overlay that eats clicks is a bug you cannot click your way out of. While the agent works it
+      becomes a card: the line it is doing now, and the lines it already did, newest at the bottom
+      like a transcript rather than a feed.
+
+      Standalone on purpose at this stage. It runs in a browser with a mocked event stream, so the
+      motion, the copy and the density can be judged before any of it is wired to a real agent.
+      `window.ORBIT.push(event)` is the whole contract, and the Tauri shell will emit exactly that.
+    -->
+    <link rel="stylesheet" href="overlay.css" />
+  </head>
+  <body>
+    <div id="stage">
+      <!-- data-state is the only thing that moves this UI: idle | listening | working | blocked -->
+      <div id="orbit" data-state="idle" aria-live="polite">
+        <div id="dot" role="button" tabindex="0" aria-label="Orbit — click to open the activity card">
+          <span id="pulse"></span>
+        </div>
+
+        <section id="card" aria-label="What Orbit is doing">
+          <header>
+            <span id="badge">working</span>
+            <h1 id="headline">Looking at the screen</h1>
+            <button id="stop" type="button" title="Stop — releases the mouse and keyboard at once">Stop</button>
+          </header>
+          <ol id="history" aria-label="Activity history"></ol>
+          <footer>
+            <span id="earlier"></span>
+            <span id="hint">Esc, or move the mouse, to take back control</span>
+          </footer>
+        </section>
+      </div>
+    </div>
+
+    <!-- The harness: a scripted session so the overlay can be judged on its own. Deleted the day
+         the Tauri shell emits real events; until then it is how the motion gets designed. -->
+    <script type="module" src="overlay.js"></script>
+    <script type="module" src="demo.js"></script>
+  </body>
+</html>

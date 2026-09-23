@@ -1,0 +1,323 @@
+/* THE OVERLAY'S LOOK, in one file, tokens first.
+ *
+ * Constraints this design answers:
+ *   · It sits on top of someone else's work, so it never fills the screen and never uses a colour
+ *     the desktop underneath might be using for meaning.
+ *   · It is watched while something moves the cursor, so the current line is the brightest thing
+ *     and everything else recedes.
+ *   · It renders over unknown backgrounds — white documents, dark editors, video — so it carries its
+ *     own ground and its own contrast rather than trusting the desktop.
+ */
+
+:root {
+  color-scheme: dark;
+
+  --ink: #f2f4f8;
+  --mute: #a9b1c0;
+  --faint: #6c768a;
+  --ground: #11141b;
+  --ground-2: #171b24;
+  --line: #262c38;
+
+  /* One accent, and it means "the agent is acting". Nothing else on this surface uses it. */
+  --live: #6ea8fe;
+  --live-dim: rgba(110, 168, 254, 0.16);
+  /* Consequence, not sentiment: amber is "this one leaves a mark", red is "this one cannot be undone". */
+  --mark: #e0a458;
+  --grave: #e2686d;
+  --ok: #67c39a;
+
+  --radius: 14px;
+  --dot: 96px;
+
+  --step: cubic-bezier(0.2, 0.9, 0.2, 1);
+}
+
+/* An explicit light palette, because the overlay is composited over whatever the operator has open
+ * and a light desktop deserves a surface that does not glow. */
+/* Explicit light, for a settings toggle and for testing. Declared before the media query so the
+   media query can still win for anyone who has not chosen. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --ink: #10131a;
+  --mute: #4d5566;
+  --faint: #7b8493;
+  --ground: #fbfcfe;
+  --ground-2: #f2f4f8;
+  --line: #dde2ea;
+  --live: #2f6fe0;
+  --live-dim: rgba(47, 111, 224, 0.12);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --ink: #10131a;
+    --mute: #4d5566;
+    --faint: #7b8493;
+    --ground: #fbfcfe;
+    --ground-2: #f2f4f8;
+    --line: #dde2ea;
+    --live: #2f6fe0;
+    --live-dim: rgba(47, 111, 224, 0.12);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  /* TRANSPARENT: the window is the desktop. In the browser harness this shows as the page ground. */
+  background: transparent;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 24px;
+  /* The stage never takes the mouse; only the dot and the card do. */
+  pointer-events: none;
+}
+
+#orbit {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+/* ── The dot ─────────────────────────────────────────────────────────────────────────────────── */
+
+#dot {
+  width: var(--dot);
+  height: var(--dot);
+  border-radius: 50%;
+  background:
+    radial-gradient(120% 120% at 30% 25%, var(--ground-2) 0%, var(--ground) 62%),
+    var(--ground);
+  border: 1px solid var(--line);
+  /* Two shadows: a tight one to sit it on the desktop, a wide soft one so it reads as floating
+     rather than pasted. */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 18px 48px rgba(0, 0, 0, 0.32);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 220ms var(--step), box-shadow 220ms var(--step), opacity 180ms linear;
+}
+
+#dot:hover { transform: scale(1.06); }
+#dot:focus-visible { outline: 2px solid var(--live); outline-offset: 3px; }
+
+#pulse {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--mute);
+  transition: background 240ms linear, box-shadow 240ms linear, transform 240ms var(--step);
+}
+
+/* Listening: the dot breathes. Slow, because a fast pulse on someone's screen reads as an alarm. */
+[data-state="listening"] #pulse {
+  background: var(--live);
+  box-shadow: 0 0 0 6px var(--live-dim);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+
+/* Working: the dot gives way to the card. It stays as the card's handle, smaller. */
+[data-state="working"] #dot,
+[data-state="blocked"] #dot {
+  width: 40px;
+  height: 40px;
+}
+[data-state="working"] #pulse {
+  width: 10px;
+  height: 10px;
+  background: var(--live);
+  animation: breathe 1.4s ease-in-out infinite;
+}
+[data-state="blocked"] #pulse {
+  width: 10px;
+  height: 10px;
+  background: var(--mark);
+}
+
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.82); opacity: 0.72; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #pulse { animation: none !important; }
+  #dot, #card { transition: none !important; }
+}
+
+/* ── The card ────────────────────────────────────────────────────────────────────────────────── */
+
+#card {
+  width: 380px;
+  max-width: min(380px, calc(100vw - 96px));
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 24px 64px rgba(0, 0, 0, 0.38);
+  overflow: hidden;
+  /* Closed by default: a card that exists but is not needed must take no space and no attention. */
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  transform-origin: bottom right;
+  max-height: 0;
+  transition: opacity 200ms linear, transform 260ms var(--step), max-height 260ms var(--step);
+}
+
+[data-state="working"] #card,
+[data-state="blocked"] #card,
+#orbit.open #card {
+  opacity: 1;
+  transform: none;
+  max-height: 60vh;
+}
+
+#card header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+#badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--live);
+  background: var(--live-dim);
+  border-radius: 6px;
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+[data-state="blocked"] #badge { color: var(--mark); background: rgba(224, 164, 88, 0.14); }
+
+#headline {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.3;
+  /* Two lines, then ellipsis: a long target description must not push the history off screen. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+#stop {
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+#stop:hover { border-color: var(--grave); color: var(--grave); }
+
+/* ── The history ─────────────────────────────────────────────────────────────────────────────── */
+
+#history {
+  list-style: none;
+  margin: 0;
+  padding: 8px 6px;
+  max-height: 40vh;
+  overflow-y: auto;
+  /* A transcript reads down: the newest line is at the bottom, where the eye already is because
+     that is where the current action just was. */
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  scrollbar-width: thin;
+}
+
+#history li {
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: var(--mute);
+  line-height: 1.35;
+}
+
+#history li[data-outcome="running"] {
+  color: var(--ink);
+  background: var(--live-dim);
+}
+
+/* The mark in the gutter says what happened, in a glyph a colour-blind reader can still tell
+   apart — the colour is the second signal, never the only one. */
+#history .mark { font-size: 11px; text-align: center; color: var(--faint); }
+#history li[data-outcome="running"] .mark { color: var(--live); }
+#history li[data-outcome="done"] .mark { color: var(--ok); }
+#history li[data-outcome="failed"] .mark,
+#history li[data-outcome="refused"] .mark { color: var(--grave); }
+#history li[data-outcome="declined"] .mark,
+#history li[data-outcome="interrupted"] .mark { color: var(--mark); }
+
+#history .when {
+  font-size: 10.5px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* WARNED BEFORE, NOT LABELLED AFTER. A step that leaves a mark says so while it is the step about
+   to happen — that is when the warning can still be acted on. Once it is done the tag is noise, and
+   repeated down a transcript it trains the eye to skip exactly the rows worth reading.
+   Irreversible keeps its tag permanently: "this cannot be undone" stays true afterwards, and the
+   history is what someone reads when working out what went wrong. */
+#history li[data-outcome="running"][data-consequence="consequential"] .line::after {
+  content: " · leaves a mark";
+  color: var(--mark);
+  font-size: 11px;
+}
+#history li[data-consequence="irreversible"] .line::after {
+  content: " · cannot be undone";
+  color: var(--grave);
+  font-size: 11px;
+}
+
+/* The gutter glyph carries the outcome, so it must be legible at a glance rather than decorative. */
+#history .mark {
+  font-size: 12px;
+  line-height: 1.35;
+  font-weight: 700;
+}
+
+#history .why {
+  display: block;
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+#card footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 14px 11px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  color: var(--faint);
+}
+
+#earlier:empty { display: none; }
