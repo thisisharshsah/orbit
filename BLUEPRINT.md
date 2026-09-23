@@ -522,8 +522,9 @@ hard gate on regressions.
 | **OSWorld / OSWorld-Verified** | Multi-step desktop tasks across real apps | Primary public capability signal |
 | **WindowsAgentArena** | Windows-specific desktop tasks | Platform parity |
 | **AndroidWorld** | Mobile agent tasks | Mobile parity |
-| **WebArena / VisualWebArena** | Self-hosted web tasks, reproducible | Regression harness |
-| **Online-Mind2Web / WebVoyager** | Live web navigation | Drift and real-site brittleness |
+| **WebArena-Infinity** | Auto-generated web environments with programmatic verifiers | Regression harness, and the model for E-Bench |
+| **WebArena / VisualWebArena** | Self-hosted web tasks, reproducible | Legacy reference — read with the scaffold gap below |
+| **Online-Mind2Web** | Live web navigation | Smoke test only: saturated, and closed to submissions |
 | **ScreenSpot-Pro** | Grounding precision on dense professional UIs | Decides whether grounding assist is needed |
 | **E-Bench (internal)** | Customer workflows: ERP, CRM, spreadsheets, ticketing | The gate that matters commercially |
 
@@ -550,6 +551,44 @@ Three more traps worth knowing before anyone quotes a figure:
 - **About 15% of recorded failures are not failures.** An audit of five computer-use benchmarks found
   10.7% evaluator false negatives and 4.7% broken tasks. Our own harness needs a manual audit of a
   sample of failures, or we will chase bugs that are the scorer's.
+
+**Three of the web suites cannot carry a target at all**, checked against their own boards on
+23 September 2026:
+
+- **WebVoyager is deprecated and should be dropped.** Unmaintained by its authors; roughly 15% of its
+  tasks are answerable from pretraining; automatic evaluators disagree with human annotation by 20–40%;
+  and Operator's reported 87% became **68.6%** on a cleaned 535-task re-run. It also **has no human
+  baseline** — every "human" number in the paper is judge *agreement* (85.3%, κ=0.70), and the ~78%
+  figure circulating beside it is WebArena's, misattributed.
+- **Online-Mind2Web saturated and then shut.** 78.7% in November 2025, **97.7%** by August 2026, and
+  public submissions are now closed. Its task set has been swapped seven times since April 2025, so a
+  date is part of every score; the top three entries were graded by a paid outsourced human-evaluation
+  service rather than by the benchmark's authors; the current leader is a pre-launch company with no
+  published methodology whose product name contains "Handoff". An independent harness scores the same
+  benchmark at **42.3%**.
+- **WebArena's headline comparison is not a comparison.** Its 78.24% human baseline was measured on
+  template-sampled tasks, not the 812-task set agents are scored on. The 74.3% record comes from a
+  tree-search scaffold with no disclosed compute budget; under BrowserGym's standard agent the same
+  benchmark tops out at **44.6%**. That 30-point spread is the scaffold, not the model.
+
+**Two comparability rules, which govern every benchmark number in this document.** First, rule-based
+self-hosted scoring is systematically *pessimistic* — 16.7% below expert annotation on WebArena, 18.5%
+on VisualWebArena — while LLM-judge live-web scoring is systematically *optimistic*. They never belong
+in the same table. Second, the step budget is part of the score: one model on OSWorld goes 26% → 31.3%
+→ 31.4% at 15, 50 and 100 steps, another 9.1% → 17.2% → 23%. Most web boards record no cap at all.
+
+**What to adopt instead: generate the environment.** WebArena-Infinity (March 2026, from WebArena's own
+first author) auto-generates web apps, difficulty-graded tasks and **programmatic verifiers** from real
+artifacts, at under $100 and under ten hours per environment — ten environments, 1,260 tasks, best score
+69.3%. Models score consistently *lower* there than on the hand-built suites (one scores 45.9% here
+against 58.9% on WebArena and 63.3% on OSWorld-Verified), which is what an unsaturated benchmark looks
+like. That is the shape E-Bench should have: customer workflows generated into environments with
+verifiers, refreshed on a cadence — not two hundred hand-written tasks that rot in a quarter.
+
+One sourcing note, since it cost time to establish: at least one VisualWebArena entry in circulation
+("PANDO", dated May 2026) appears on neither the official board nor the BrowserGym one and is likely
+SEO-generated, and several aggregator sites republish benchmark tables with no traceable provenance.
+A number that cannot be traced to a board, a paper or a vendor page does not go in a deck.
 
 Orbit's internal suite scores **completion**, binary, per task family, and records the release and
 effort level beside every number.
@@ -661,7 +700,8 @@ and a screenshot of the redaction mask over a password field.
 
 | Section | Status |
 |---|---|
-| §4 models, coordinates, caching · §6 cost · §9 benchmarks | **Verified** against vendor documentation and the benchmark's own paper and board, September 2026 |
+| §4 models, coordinates, caching · §6 cost | **Verified** against vendor documentation, September 2026 |
+| §9 benchmarks | **Verified**, September 2026, from the boards' own data rather than their websites: the WebArena/VisualWebArena spreadsheet, the BrowserGym and Online-Mind2Web spaces' raw files, the OSWorld results workbook, the Mind2Web-2 leaderboard JSON, and the GAIA results parquet. Several project sites are stale by 30+ points and were not used. |
 | §8 EU AI Act | **Verified** against Commission guidance and consolidated Article text — with one caveat: the Official Journal site was unreachable during the check, so the consolidation was corroborated against Commission PDFs rather than read from the OJ. Pull the OJ text before this goes to counsel. |
 | §8 GDPR, works councils, enforcement history | **Verified**, September 2026: WP248 rev.01 and WP249 read directly, the French and German Art. 35(4) blacklists, the CNIL fiche of 9 July 2026, and 25 published decisions (CNIL, Garante, AEPD, ICO, AP, HmbBfDI, ECtHR, Conseil d'État, Rb. Zeeland-West-Brabant) traced to Légifrance, garanteprivacy.it, ico.org.uk, rechtspraak.nl and the Court's own factsheet. Amounts marked here are the ones the primary source states; a handful of Garante fine amounts rest on secondary reporting and are not quoted. |
 | §8 US state law | **Verified**, September 2026, against the statutes themselves: 740 ILCS 14 (BIPA, as amended 2024), Cal. Penal Code § 637.2, the CPPA ADMT and risk-assessment regulations, Colo. Rev. Stat. § 6-1-1314(6), Tex. Bus. & Com. Code § 503.001, and the NY/CT/DE notice statutes. One sourcing note: the Texas code site now serves no text to a fetcher, so § 503.001 was read from the Legislative Council's static mirror. |
