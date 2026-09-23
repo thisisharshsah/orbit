@@ -28,6 +28,9 @@ the headcount do not, and those are where the money is.
 | 14 | Store every frame, encrypted | Frame retention **off by default** | Screen frames are the most sensitive telemetry a company can hold. Action logs and hashes by default; frames only on explicit per-customer opt-in with their KMS key. |
 | 15 | One session for voice and vision | §4: **two sessions, joined by the daemon** | No vendor supports computer use and bidirectional audio in the same model. Verified across all three. This is a structural change, not a detail. |
 | 16 | 20-step tasks assumed in costing | §6: **~318 steps** for long tasks | The current desktop benchmark averages 318 tool calls per task. The first cost pass was out by an order of magnitude at the long end. |
+| 18 | OmniParser V2 as grounding | §4: **a crop-and-zoom scaffold we own** | The named parsers are 40+ points off the state of the art and unmaintained; a frontier model with a crop scaffold beats every specialist. Deletes a 35-person squad from the org chart. |
+| 19 | Grounding treated as the hard problem | §4: **verification is the bottleneck** | An audit of five benchmarks finds planning and verification failures dominate grounding failures. The recovery loop earns more than any grounding work. |
+| 20 | AI Act treated as one 2026 deadline | §8: **two dates, and only one moved** | High-risk duties slipped to Dec 2027; the workplace emotion-recognition ban has applied since Feb 2025 and is enforceable now. |
 | 17 | "≥65% OSWorld" as a GA target | §9: score **completion**, not partial credit | Vendor-quoted ~80% is partial credit; binary completion at publication was ~20%. Four-times misreading if taken at face value. |
 
 Everything else — the Rust core, Tauri overlay, typed action schema, hardware kill switch, bare-metal
@@ -158,9 +161,24 @@ Non-negotiables in the adapter layer:
 - **Re-ground before acting on a stale plan.** An action carries a **lease**: the hash of the frame it
   was planned against and a TTL. If the screen changed, the daemon refuses and asks for a new plan.
   This is the cheapest available defence against mis-clicks, and the original plan does not have it.
-- **Grounding assist is conditional.** Run the parser when the planner's confidence is low, when the
-  frame is dense (spreadsheet, CAD, ERP grid), or when a click has already failed once. Running it on
-  every frame is most of the latency and most of the GPU bill for a minority of the benefit.
+- **Grounding assist is a SCAFFOLD, not a parser, and not a squad.** Verified September 2026: the
+  screen parsers the original plan named are obsolete — OmniParser V2 scores 39.5% on ScreenSpot-Pro
+  against a record of 82.7%, and its line has no successor. Meanwhile a frontier model grounding
+  natively in one pass scores ~74.8%, and **the same model wrapped in a crop-and-zoom scaffold scores
+  87.9% — higher than any specialist grounder.** Every top entry on the public grounding leaderboard is
+  a zoom/crop/ensemble pipeline rather than a single forward pass, and one vendor's own evaluation
+  swings 12 points on a resolution flag alone.
+
+  So what we build is small and ours: when the planner is unsure or the frame is dense, crop to the
+  region it named, send it at higher resolution, and ask again. That is a few hundred lines and a
+  latency budget, not a 35-person modelling effort. Remaining headroom is almost entirely **icons**
+  (the record holder: 90.4% on text, 70.4% on icons), which is worth knowing when a customer's UI is
+  a toolbar.
+- **Grounding is no longer the bottleneck — verification is.** An independent audit of five
+  computer-use benchmarks finds that among genuine failures, *planning and verification* errors
+  dominate execution and grounding errors. The agent's problem is not finding the button; it is knowing
+  whether the click worked and what to do when it did not. Staff and design accordingly: the recovery
+  loop (did the screen change as predicted? if not, re-plan) earns more than any grounding investment.
 - **Local models do intent, not grounding.** On-device SLMs classify "is this for the agent at all",
   filter wake words and pre-screen for secrets. They do not plan clicks.
 
@@ -300,9 +318,19 @@ This gates EU deployment harder than SOC 2 does, and the original plan does not 
 - **Voice** adds a second category. Several US states regulate voiceprints specifically; "we only stream,
   never store" must be architecturally true and documented, because it is the claim that keeps voice out
   of biometric scope.
-- The **EU AI Act** imposes obligations on workplace monitoring systems and prohibits emotion inference at
-  work. Orbit must be able to prove it does not do the latter: no affect models, no sentiment scoring,
-  and that stated in the technical documentation.
+- The **EU AI Act**, verified against the Commission's own texts: the high-risk obligations covering
+  employment monitoring — including the duty to inform workers and their representatives before the
+  system goes into service — were **pushed to 2 December 2027** by the 2026 omnibus. That is about
+  sixteen months more runway than an older plan assumes.
+  **What did not move is the part that bites.** The prohibition on emotion recognition in the workplace
+  has applied since February 2025, with enforcement powers live since August 2026, and the Commission's
+  guidance gives examples that describe this product almost exactly: a call centre using webcams and
+  voice recognition to track employees' anger, and systems inferring emotion from voice and video. A
+  continuous screen-and-voice agent is **one feature request away** — "flag the frustrated reps" — from
+  a prohibited practice with no transition period at all.
+  So it is an architectural constraint, not a compliance checkbox: no affect model, no sentiment score,
+  no "engagement" metric, and the absence stated in the technical documentation. Any such request is
+  refused at the product level, in writing, before it reaches a backlog.
 - **Design consequences, priced in now rather than retrofitted:** session-scoped capture (agent sees the
   screen only while invoked, never ambiently), a visible indicator whenever capture is live, per-user
   data export and deletion, regional data residency, and customer-controlled retention with a zero option.
@@ -324,12 +352,32 @@ hard gate on regressions.
 | **ScreenSpot-Pro** | Grounding precision on dense professional UIs | Decides whether grounding assist is needed |
 | **E-Bench (internal)** | Customer workflows: ERP, CRM, spreadsheets, ticketing | The gate that matters commercially |
 
-**The metric trap, and it is the most consequential error available here.** The ~80% OSWorld 2.0
-figures vendors quote are **partial credit**, not task completion. The benchmark paper's own
-best-at-publication result was **20.6% binary completion** against 54.8% partial. A business case
-resting on "the model succeeds 80% of the time" is misreading the number by roughly four times. Orbit's
-internal suite scores **completion**, binary, per task family — and reports partial credit separately if
-at all.
+**Where the state of the art actually is, from the official board (17 Sep 2026):**
+
+| | Binary completion | Partial credit |
+|---|---|---|
+| Best overall (Claude Opus 5) | **44.33%** | 77.67% |
+| Best non-Anthropic (GPT-5.6 Sol) | 27.34% | 62.72% |
+
+**The metric trap, and it is the most consequential error available here.** The ~80% figures vendors
+quote are the right-hand column. The same run completes **44%** of tasks. A business case resting on
+"it succeeds 80% of the time" is out by nearly two times at best, and the plan's "≥65% OSWorld / ≥98.5%
+internal" targets are not on the same axis as any published number.
+
+Three more traps worth knowing before anyone quotes a figure:
+
+- **Cite the task release and the effort level or the number means nothing.** OSWorld 2.0 shipped three
+  incompatible task sets; the same model and configuration scores 44.33% on one and 31.43% on another.
+  Effort level alone moves one model from 18.81% to 44.33%.
+- **There is no human baseline for OSWorld 2.0.** The 72.36% figure in circulation was a stated lower
+  bound on the *original* benchmark, never re-measured. Claims of "surpassing humans" that compare
+  against it are comparing across different benchmarks.
+- **About 15% of recorded failures are not failures.** An audit of five computer-use benchmarks found
+  10.7% evaluator false negatives and 4.7% broken tasks. Our own harness needs a manual audit of a
+  sample of failures, or we will chase bugs that are the scorer's.
+
+Orbit's internal suite scores **completion**, binary, per task family, and records the release and
+effort level beside every number.
 
 Gates per pull request: no regression in task success rate, click precision, or PII leakage. Leakage is
 the one metric with an absolute target — **zero** unredacted sensitive entities transmitted, treated as
@@ -356,8 +404,10 @@ order of **$100M/year** — the original plan's largest number, and it was not i
 
 Two structural notes on the original org:
 
-- **AI/ML at 120 FTEs is mis-shaped** when frontier models come from vendors. Split: grounding and
-  evaluation deserve most of it; "prompt engineering" is not a 35-person discipline. Redirect toward
+- **AI/ML at 120 FTEs is mis-shaped** when frontier models come from vendors — and more so now that
+  grounding turns out to be a crop-and-zoom scaffold rather than a modelling problem (§4), and that the
+  dominant failure mode is verification rather than grounding. The 35-person grounding squad becomes a
+  small scaffold-and-recovery team; "prompt engineering" is not a 35-person discipline either. Redirect toward
   **enterprise connectors** (the margin path, §6) and **evaluation infrastructure** (the only thing that
   tells you whether a change helped).
 - **Security at 45 and QA at 60** are right in magnitude and wrong in sequence — both are needed in P2,
@@ -437,6 +487,12 @@ were checked against vendor documentation in September 2026. **The platform-perm
 the employment-law claims in §8 were NOT independently verified** — they are my own knowledge, they are
 the sections most likely to reshape the plan, and they should be re-checked before anyone commits
 engineering to them.
+
+**A note on sourcing, learned the hard way during this review.** Fabricated leaderboards are in
+circulation: at least one site publishes a ScreenSpot-Pro table attributing a real 87.9% score to the
+wrong model, and a widely-repeated claim of €47m in AI Act fines — including €15m for workplace emotion
+recognition — has no decision behind it and appears to be invented. No frontier vendor publishes
+ScreenSpot-Pro for its own model at all. Cite primary sources or cite nothing.
 
 These need answers from outside this document, and the plan should not pretend otherwise:
 
