@@ -12,7 +12,7 @@ the headcount do not, and those are where the money is.
 
 | # | Original claim | Revision | Why it matters |
 |---|---|---|---|
-| 1 | No cost model | §6 adds one | At best-case caching, the model bill is **~$56/seat/month**; naive history resend is 10× that. A 500-seat deployment can cost more in inference than in licence revenue. This is the single most important missing number. |
+| 1 | No cost model | §6 adds one | Model cost runs from **~$33 to ~$1,089 per seat per month** depending on how long the tasks are, and nothing in the plan measured that. A 500-seat deployment can cost more in inference than it earns in licence. The single most important missing number. |
 | 2 | "1,000,000 concurrent sessions" at GA | Re-scoped, with arithmetic | 1M concurrent at one model call every 2s is **500,000 multimodal requests/sec** — on the order of 250,000 accelerators. Not a scaling target; a category error. |
 | 3 | "Sub-600ms total loop (voice → decision → click)" | §5 gives a staged budget | Speech-to-first-audio-token near 300ms is real. A *grounded screen action* in 600ms is not, with any cloud VLM. Promising it sets the team up to fail a number rather than ship a product. |
 | 4 | Single model vendor (Gemini) | §4 makes the model layer swappable | Coordinate conventions, resolution limits and pricing differ per vendor and change every few months. One adapter interface, three backends, eval-driven routing. |
@@ -26,6 +26,9 @@ the headcount do not, and those are where the money is.
 | 12 | Compliance: SOC 2 / HIPAA / ISO | Adds employee-monitoring law | Continuous capture of an employee's screen *and voice* engages GDPR (DPIA, works-council consultation in DE/FR), state biometric law for voiceprints, and EU AI Act workplace provisions. This gates EU rollout harder than SOC 2 does. |
 | 13 | 500 FTEs from the start | §10 ramps 40 → 140 → 320 → 500 | 500 engineers on a product with no proven loop is a coordination cost, not capacity. Fully loaded, 500 FTEs is roughly **$100M/year**; the original has no budget line at all. |
 | 14 | Store every frame, encrypted | Frame retention **off by default** | Screen frames are the most sensitive telemetry a company can hold. Action logs and hashes by default; frames only on explicit per-customer opt-in with their KMS key. |
+| 15 | One session for voice and vision | §4: **two sessions, joined by the daemon** | No vendor supports computer use and bidirectional audio in the same model. Verified across all three. This is a structural change, not a detail. |
+| 16 | 20-step tasks assumed in costing | §6: **~318 steps** for long tasks | The current desktop benchmark averages 318 tool calls per task. The first cost pass was out by an order of magnitude at the long end. |
+| 17 | "≥65% OSWorld" as a GA target | §9: score **completion**, not partial credit | Vendor-quoted ~80% is partial credit; binary completion at publication was ~20%. Four-times misreading if taken at face value. |
 
 Everything else — the Rust core, Tauri overlay, typed action schema, hardware kill switch, bare-metal
 device farm, coordinate normalisation, audit trail — is kept, and in several places tightened.
@@ -128,6 +131,25 @@ trait Planner {
 }
 ```
 
+### The finding that shapes the architecture: **voice and computer use cannot share a session**
+
+Verified against all three vendors' documentation, as of September 2026:
+
+| Vendor | Bidirectional audio | Computer use in that same session | Coordinates |
+|---|---|---|---|
+| Anthropic | **No audio API at all** | — | **Pixels**, in the screenshot's own space; display-size parameters were removed in Aug 2026 |
+| OpenAI | Yes (realtime + live models, GA) | **No** — those models do function calling only, and one cannot even take images | **Pixels**; docs cite a 1440×900 viewport |
+| Google | Yes (live models, GA) | **No** — the live model's card says "Computer use: Not supported" | **Normalised 0–999**, but the official denormaliser divides by 1000 |
+
+So Orbit runs **two concurrent sessions**, not one: a voice session that hears the operator and speaks
+back, and a computer-use session that looks and acts. The daemon is what joins them — it holds the
+conversation state, and the two vendors never see each other. That is more moving parts than the
+original diagram implied, and it is not optional with any vendor today.
+
+It also means **no vendor publishes a latency SLA** for either half. Independent measurements of
+time-to-first-audio disagree by an order of magnitude, and one vendor forum thread this month reports a
+regression from ~1s to 9–15s. Any latency number in a plan is our measurement or nobody's.
+
 Non-negotiables in the adapter layer:
 
 - **Coordinate normalisation is per-vendor.** Internally Orbit uses a normalised `[0..1000]` space with
@@ -166,50 +188,69 @@ optimising hard.
 | **Total, with assist** | **~0.5–1.5 s** | dense UIs |
 
 **Target to hold the team to:** p50 under 1.2s, p95 under 2.5s, for a grounded action on a 1280×720
-frame. Then make the *conversation* fast, so the wait is filled by the agent saying what it is doing.
+frame — **our own measurement, because no vendor publishes a latency figure for either half of
+this loop.** Independent measurements of time-to-first-audio disagree by an order of magnitude, and
+a vendor forum thread this month reports a regression from ~1s to 9–15s. Measure it per release or
+do not claim it. Then make the *conversation* fast, so the wait is filled by the agent saying what it is doing.
 
 ---
 
-## 6. Unit economics — the section the original lacks
+## 6. Unit economics — corrected, and worse than the first pass
 
-Using the common `tokens ≈ (width × height) / 750` image accounting:
+**Two corrections since the first draft, both from vendor and paper sources, both large.**
 
-| Frame | Tokens per screenshot |
-|---|---|
-| 1920×1080 native | ~2,765 |
-| 1280×720 | ~1,229 |
-| 1024×768 (XGA) | ~1,049 |
-| 768×432 downscaled | ~442 |
+**Correction 1: the step count.** The first pass assumed a 20-step task. OSWorld 2.0 (the current
+desktop benchmark, published mid-2026) reports **~318 tool calls per task on average**, against ~30 in
+the previous version, with a human median around 1.6 hours per task. Real desktop work is an order of
+magnitude longer than the plan assumed.
 
-A 20-step task at 1280×720:
+**Correction 2: image tokens.** Use the vendor's own formula — `⌈w/28⌉ × ⌈h/28⌉` visual tokens —
+rather than an approximation, and note that the maximum image resolution rose in April 2026, which
+roughly tripled image tokens for anyone who simply sends what they capture.
 
-| Strategy | Input tokens | At $3/M | At $15/M |
+| Resolution | Visual tokens | Per screenshot @ $4/MTok | @ $10/MTok |
 |---|---|---|---|
-| Naive — resend full history each step | ~258k | $0.77 | $3.87 |
-| Frame diffing + prompt caching | ~28k | **$0.08** | $0.42 |
+| 1024×768 | 1,036 | $0.0041 | $0.0104 |
+| 1280×720 | 1,196 | $0.0048 | $0.0120 |
+| 1280×800 | 1,334 | $0.0053 | $0.0133 |
+| 1920×1080 | 2,691 | $0.0108 | $0.0269 |
 
-At 30 tasks/day, 22 working days, diffed and cached, on a $3/M-input model:
+Sending the native 1080p frame instead of 1024×768 costs **2.6× per step**, every step, forever. The
+capture path downscales before encoding, and that is not an optimisation to schedule later.
 
-- **~$56 per seat per month** in planner tokens alone.
-- **500 seats ≈ $28k/month, ~$336k/year.** On a premium model, five times that.
-- Naive history handling multiplies it by ten, which is the difference between a viable product and one
-  that loses money per seat.
+### Cost by task length — the number that decides the product
 
-**What this dictates, architecturally:**
+Fresh image input only, at $4/MTok; text, output and resent prefix are extra.
 
-1. Frame diffing and prompt caching are not optimisations, they are the business model. They belong in
-   Phase 1, not Phase 2.
-2. Resolution is a cost dial. Serve the smallest frame that still grounds correctly, per application.
-3. The API connector path (§1) is also the margin path: every workflow moved off pixels onto an API
-   removes its token cost entirely.
-4. Price per seat with a task ceiling, or price per task. A flat unlimited seat price on a token-metered
-   backend is an unhedged short position.
+| Task | Steps | Image tokens | Cost/task |
+|---|---|---|---|
+| Micro ("open the doc, paste this") | 10 | ~12k | ~$0.05 |
+| Short ("find the weather, write it down") | 30 | ~36k | ~$0.14 |
+| Ordinary office task | 80 | ~96k | ~$0.38 |
+| Long, benchmark-style | **318** | **~413k** | **~$1.65** |
 
-**And the GA scaling claim:** 1M concurrent sessions at one call per 2s is 500k multimodal requests/sec
-— roughly 250k accelerators at 2 req/s each. Re-scope GA to **10k concurrent sessions** on vendor APIs
-with per-tenant quotas, and treat 100k as a multi-year infrastructure programme with its own business case.
+At 30 tasks/day × 22 days, that spread is **$33/seat/month at the micro end and $1,089 at the long
+end** — on a premium model, several times that. The plan cannot be costed until the real mix is
+measured, so **measuring it is a Phase 1 deliverable**, not a Phase 3 finance exercise.
 
----
+What follows from it:
+
+1. **Task length is the cost lever, not model choice.** Ten micro-tasks cost less than one long one.
+   Product design should push work toward short, well-scoped requests and refuse to grind.
+2. **Caching is worth several×, and is easy to break.** The vendor's own guidance: prune old
+   screenshots **in batches** (dropping one per turn changes the prefix every turn and invalidates the
+   cache), keep the last few, and on the newest models do not prune client-side at all — removing an
+   earlier screenshot invalidates later reasoning blocks; use server-side tool-result clearing instead.
+   Getting this wrong is a multiple, not a rounding error.
+3. **A cheap model for cheap steps.** Most steps are "look, then click the obvious thing". Routing
+   those to a small model and escalating only on ambiguity is the difference between $0.10 and $1.65
+   for the same task — the smallest tier is ~40× cheaper per token than the largest.
+4. **API connectors remove the cost entirely** for the workflows they cover. That is the margin path.
+5. **Machine cost can exceed model cost.** If any of this runs on hosted macOS VMs, note that cloud Mac
+   instances carry a 24-hour minimum host commitment — a short run can be ~95% machine, ~5% model.
+
+**And the GA scaling claim still fails**: 1M concurrent sessions at one call every 2s is 500k
+multimodal requests/sec. Re-scope to 10k concurrent with per-tenant quotas.
 
 ## 7. Safety and security
 
@@ -282,6 +323,13 @@ hard gate on regressions.
 | **Online-Mind2Web / WebVoyager** | Live web navigation | Drift and real-site brittleness |
 | **ScreenSpot-Pro** | Grounding precision on dense professional UIs | Decides whether grounding assist is needed |
 | **E-Bench (internal)** | Customer workflows: ERP, CRM, spreadsheets, ticketing | The gate that matters commercially |
+
+**The metric trap, and it is the most consequential error available here.** The ~80% OSWorld 2.0
+figures vendors quote are **partial credit**, not task completion. The benchmark paper's own
+best-at-publication result was **20.6% binary completion** against 54.8% partial. A business case
+resting on "the model succeeds 80% of the time" is misreading the number by roughly four times. Orbit's
+internal suite scores **completion**, binary, per task family — and reports partial credit separately if
+at all.
 
 Gates per pull request: no regression in task success rate, click precision, or PII leakage. Leakage is
 the one metric with an absolute target — **zero** unredacted sensitive entities transmitted, treated as
@@ -383,6 +431,12 @@ and a screenshot of the redaction mask over a password field.
 ---
 
 ## Appendix — open questions
+
+**Verification status, stated plainly.** The model, pricing, coordinate, caching and cost figures above
+were checked against vendor documentation in September 2026. **The platform-permission claims in §2 and
+the employment-law claims in §8 were NOT independently verified** — they are my own knowledge, they are
+the sections most likely to reshape the plan, and they should be re-checked before anyone commits
+engineering to them.
 
 These need answers from outside this document, and the plan should not pretend otherwise:
 
