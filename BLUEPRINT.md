@@ -437,6 +437,39 @@ proportionate, CSE consultation at 50+ employees (L. 2312-38, L. 2312-8 II 4°),
 of workers (L. 1222-4, which makes undisclosed collection unlawful on its own). The same fiche gives
 keyloggers on a teleworker as its worked example of a prohibited device.
 
+### The United States: the microphone is the exposure, not the screen
+
+Most state comprehensive privacy laws define "consumer" so as to exclude people acting in an employment
+context, and so do not reach employee monitoring at all — Texas, Connecticut and Colorado's general
+provisions among them. **California is the exception**: its HR carve-out expired on 1 January 2023.
+Colorado then went the other way and wrote an employee-specific rule *into* its biometric amendment. So
+US risk is not spread evenly. It concentrates in four places.
+
+- **BIPA is about the voiceprint, not the voice.** A recording is not a biometric identifier; a template
+  derived from vocal characteristics is. So speaker identification and diarisation-by-voice are out —
+  which costs a real feature ("who said that") and is worth it, because Illinois BIPA remains the only
+  US biometric statute with a private right of action, at $1,000 or $5,000 per violation plus fees. The
+  2024 amendment caps repeat collections at one recovery per person per method, turning an unbounded
+  per-scan exposure into a large but finite one. Bounded is not the same as acceptable.
+- **All-party-consent wiretap law is the bigger practical risk, and the operator cannot consent it
+  away.** In California, Illinois, Pennsylvania, Florida, Washington, Massachusetts, Maryland, Michigan,
+  Montana, Nevada and New Hampshire, capturing a third party — a customer on a call, a family member in
+  a home office, someone passing the desk — requires *their* consent too. California alone is $5,000 per
+  violation or three times damages, with no actual-damages prerequisite (Cal. Penal Code § 637.2). This
+  is what makes push-to-talk a legal requirement rather than a taste: a microphone open only while a key
+  is held, retaining nothing, is the only version of this feature that does not accumulate per-violation
+  liability across eleven states.
+- **California's ADMT rules describe the product §1 refuses.** The CPPA regulations took effect
+  1 January 2026, with ADMT compliance due 1 January 2027 and the first risk-assessment attestation by
+  1 April 2028. They give productivity-monitoring software used to set work allocation, compensation or
+  demotion as a worked example of a "significant decision" use. The manager view is not merely
+  unlawful in the EU; in California it is a named regulated use.
+- **Colorado § 6-1-1314(6)** (in force 1 July 2025) is the sharpest employee-specific provision in the
+  country: an employer may not condition employment on consent to *retain* biometric data used to track
+  how much time an employee spends in a hardware or software application.
+- **Monitoring-notice statutes** in New York, Connecticut and Delaware carry small penalties and are
+  cheap to satisfy. Satisfy them.
+
 ### The AI Act, unchanged from the last revision
 
 - The **EU AI Act**, verified against the Commission's own texts: the high-risk obligations covering
@@ -631,7 +664,7 @@ and a screenshot of the redaction mask over a password field.
 | §4 models, coordinates, caching · §6 cost · §9 benchmarks | **Verified** against vendor documentation and the benchmark's own paper and board, September 2026 |
 | §8 EU AI Act | **Verified** against Commission guidance and consolidated Article text — with one caveat: the Official Journal site was unreachable during the check, so the consolidation was corroborated against Commission PDFs rather than read from the OJ. Pull the OJ text before this goes to counsel. |
 | §8 GDPR, works councils, enforcement history | **Verified**, September 2026: WP248 rev.01 and WP249 read directly, the French and German Art. 35(4) blacklists, the CNIL fiche of 9 July 2026, and 25 published decisions (CNIL, Garante, AEPD, ICO, AP, HmbBfDI, ECtHR, Conseil d'État, Rb. Zeeland-West-Brabant) traced to Légifrance, garanteprivacy.it, ico.org.uk, rechtspraak.nl and the Court's own factsheet. Amounts marked here are the ones the primary source states; a handful of Garante fine amounts rest on secondary reporting and are not quoted. |
-| §8 US state law (BIPA, wiretap, voiceprints) | **NOT verified.** Research in flight at the time of writing. No BIPA analysis, no two-party-consent analysis for the voice path. |
+| §8 US state law | **Verified**, September 2026, against the statutes themselves: 740 ILCS 14 (BIPA, as amended 2024), Cal. Penal Code § 637.2, the CPPA ADMT and risk-assessment regulations, Colo. Rev. Stat. § 6-1-1314(6), Tex. Bus. & Com. Code § 503.001, and the NY/CT/DE notice statutes. One sourcing note: the Texas code site now serves no text to a fetcher, so § 503.001 was read from the Legislative Council's static mirror. |
 | **§2 platform permissions** | **NOT verified, and the most likely to reshape the plan.** macOS TCC and MDM pre-grant, Windows UIPI and the secure desktop, Wayland portals, Android policy, iOS feasibility — all from my own knowledge. **Re-check this first.** |
 
 **A note on sourcing, learned the hard way during this review.** Fabricated leaderboards are in
