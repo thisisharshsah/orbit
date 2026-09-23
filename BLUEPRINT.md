@@ -30,6 +30,8 @@ the headcount do not, and those are where the money is.
 | 16 | 20-step tasks assumed in costing | §6: **~318 steps** for long tasks | The current desktop benchmark averages 318 tool calls per task. The first cost pass was out by an order of magnitude at the long end. |
 | 18 | OmniParser V2 as grounding | §4: **a crop-and-zoom scaffold we own** | The named parsers are 40+ points off the state of the art and unmaintained; a frontier model with a crop scaffold beats every specialist. Deletes a 35-person squad from the org chart. |
 | 19 | Grounding treated as the hard problem | §4: **verification is the bottleneck** | An audit of five benchmarks finds planning and verification failures dominate grounding failures. The recovery loop earns more than any grounding work. |
+| 21 | Voice understood as a data-protection question | §1, §8: **no acoustic inference, ever** | Emotion from voice or keystroke dynamics is a prohibited practice; the same inference from transcribed text is not. Transcribe, then analyse — an architectural line drawn once, for free. |
+| 22 | Assumed a split architecture could limit classification | §8: **it cannot** | The Commission's draft guidance assesses agentic systems together, explicitly to prevent that circumvention. |
 | 20 | AI Act treated as one 2026 deadline | §8: **two dates, and only one moved** | High-risk duties slipped to Dec 2027; the workplace emotion-recognition ban has applied since Feb 2025 and is enforceable now. |
 | 17 | "≥65% OSWorld" as a GA target | §9: score **completion**, not partial credit | Vendor-quoted ~80% is partial credit; binary completion at publication was ~20%. Four-times misreading if taken at face value. |
 
@@ -53,6 +55,12 @@ next primitive action, and an overlay that shows what the agent is about to do b
 - **A replacement for an API.** Where an enterprise system has an API, the connector path wins on speed,
   cost and reliability. GUI driving is the fallback for software that offers nothing else — which is
   most enterprise software, which is why this exists.
+- **An emotion detector.** Orbit never infers mood, stress, engagement or intent from **acoustic
+  signal, prosody, keystroke dynamics, facial expression, posture or movement**. It transcribes speech
+  and reasons about the *words*. That line is not a preference: the EU prohibition on workplace emotion
+  recognition covers behavioural biometrics — voice and keystroke dynamics among them — while analysis
+  of written text sits outside it. Transcribe, then analyse. It costs nothing to build this way and
+  cannot be retrofitted once a prosody feature exists.
 - **An iOS product.** See §2.
 
 ---
@@ -331,6 +339,25 @@ This gates EU deployment harder than SOC 2 does, and the original plan does not 
   So it is an architectural constraint, not a compliance checkbox: no affect model, no sentiment score,
   no "engagement" metric, and the absence stated in the technical documentation. Any such request is
   refused at the product level, in writing, before it reaches a backlog.
+- **One duty is live right now, not in 2027.** A deployer of an emotion-recognition or
+  biometric-categorisation system must already inform the people exposed to it, and enforcement powers
+  for the prohibitions went live in August 2026. Penalties for a prohibited practice reach **€35m or 7%
+  of worldwide turnover**. Enforcement against a deploying employer sits with *national* authorities.
+- **The obvious mitigation is closed off.** The Commission's draft classification guidance addresses
+  agentic systems directly: split architectures are assessed *together*, specifically to prevent
+  circumvention, and a component cannot claim the filtering exemption when it is part of an agentic
+  system. Decomposing Orbit so that "no single component is the monitoring system" does not work.
+- **Monitoring alone is the trigger.** The guidance treats "monitor and evaluate" as alternatives — no
+  adverse decision is required — and reads "workplace" broadly enough to include contractors, trainees
+  and candidates, in any space where work is done. "Behaviour" explicitly includes engagement with
+  trade unions.
+- **A vendor's terms do not transfer this risk.** The prohibition binds the *deployer* regardless of
+  what the provider excluded contractually, and "use" includes foreseeable misuse. Selling Orbit with a
+  clause forbidding emotion analysis protects the customer from nothing, which is why the capability
+  must be absent rather than forbidden.
+- **The wellbeing framing does not survive either.** The health-and-safety exception covers life and
+  health, not property or fraud, and general monitoring of stress at work is named as not permitted.
+  "Burnout detection" is a prohibited feature wearing a kind face.
 - **Design consequences, priced in now rather than retrofitted:** session-scoped capture (agent sees the
   screen only while invoked, never ambiently), a visible indicator whenever capture is live, per-user
   data export and deletion, regional data residency, and customer-controlled retention with a zero option.
@@ -482,11 +509,14 @@ and a screenshot of the redaction mask over a password field.
 
 ## Appendix — open questions
 
-**Verification status, stated plainly.** The model, pricing, coordinate, caching and cost figures above
-were checked against vendor documentation in September 2026. **The platform-permission claims in §2 and
-the employment-law claims in §8 were NOT independently verified** — they are my own knowledge, they are
-the sections most likely to reshape the plan, and they should be re-checked before anyone commits
-engineering to them.
+**Verification status, stated plainly.**
+
+| Section | Status |
+|---|---|
+| §4 models, coordinates, caching · §6 cost · §9 benchmarks | **Verified** against vendor documentation and the benchmark's own paper and board, September 2026 |
+| §8 EU AI Act | **Verified** against Commission guidance and consolidated Article text — with one caveat: the Official Journal site was unreachable during the check, so the consolidation was corroborated against Commission PDFs rather than read from the OJ. Pull the OJ text before this goes to counsel. |
+| §8 GDPR, works councils, US state law, enforcement history | **NOT verified.** No DPIA triggers, no BetrVG/CSE specifics, no BIPA analysis, no enforcement precedents. Written from my own knowledge only. |
+| **§2 platform permissions** | **NOT verified, and the most likely to reshape the plan.** macOS TCC and MDM pre-grant, Windows UIPI and the secure desktop, Wayland portals, Android policy, iOS feasibility — all from my own knowledge. **Re-check this first.** |
 
 **A note on sourcing, learned the hard way during this review.** Fabricated leaderboards are in
 circulation: at least one site publishes a ScreenSpot-Pro table attributing a real 87.9% score to the
