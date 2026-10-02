@@ -2,7 +2,7 @@
 # promise, and this tree holds only things that run.
 [workspace]
 resolver = "3"
-members = ["crates/orbit-core"]
+members = ["crates/orbit-core", "crates/orbit-daemon"]
 
 [workspace.package]
 edition = "2024"

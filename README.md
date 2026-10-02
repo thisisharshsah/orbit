@@ -13,10 +13,15 @@ crates/orbit-core/     the vocabulary every other piece speaks
   action.rs            what the agent may do — a closed set, and no way to say "run this"
   activity.rs          what the operator is told: the card's history, append-only
   lease.rs             what an action was planned against, and when that stops being true
+crates/orbit-daemon/   the trust boundary, as rules with no machine attached
+  redact.rs            what may leave the machine: masked, downscaled, fingerprinted — or nothing
+  validate.rs          what may reach it: app, lease, then consequence; irreversible waits for a human
+  guard.rs             when to let go: a hand on the mouse, Escape, 300ms of silence
 apps/overlay/ui/       the dot, the card, and a scripted session to design against
 ```
 
-Nothing here talks to a model, a screen or an operating system yet. That is deliberate: the rules
+Nothing here talks to a model, a screen or an operating system yet — the daemon included, which
+takes pixels, accessibility rectangles and OCR spans from a driver that does not exist yet. That is deliberate: the rules
 worth getting right — a closed action set, a settled line that cannot be rewritten, a plan that
 expires — are testable with no machine to drive, and they are the rules everything else will lean on.
 
@@ -25,7 +30,8 @@ expires — are testable with no machine to drive, and they are the rules everyt
 **The core:**
 
 ```sh
-cargo test          # 15 tests, and one of them asserts the schema cannot express a shell command
+cargo test          # 38 tests; one asserts the schema cannot express a shell command, another that
+                    # a password field leaves the machine black
 ```
 
 **The overlay**, in a browser, with a scripted session:
@@ -58,5 +64,7 @@ strings are recorded by length, not content, because the agent types passwords.
 
 1. Tauri v2 shell: transparent always-on-top window, click-through while idle, the dot on the
    platform compositor rather than in the webview.
-2. The daemon boundary: capture → redact → encode, and the action validator that enforces the lease.
-3. macOS driver first, because it is the machine this is being written on; Windows second.
+2. macOS driver first, because it is the machine this is being written on; Windows second. It feeds
+   the daemon: ScreenCaptureKit frames, AXSecureTextField rectangles, Vision OCR spans, CGEvent taps
+   that tell human input from the agent's own.
+3. The encoder behind `Released`, and frame diffing so an unchanged screen costs nothing to resend.
