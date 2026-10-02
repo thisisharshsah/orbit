@@ -8,6 +8,16 @@
 //! So an action carries the identity of the frame it was planned against and a deadline. The daemon
 //! re-captures, compares, and refuses if either has moved on. A refusal costs one round trip. A
 //! mis-click costs whatever was under the cursor.
+//!
+//! # What "moved on" means
+//!
+//! Not "any pixel changed". A real desktop is never still: a caret blinks every half second, the
+//! menu-bar clock ticks, a spinner turns. A lease that demanded an identical screen would refuse
+//! nearly every action, and refuse typing most of all, because typing is when a caret blinks. The
+//! question is narrower — is the thing at the action's point still the thing the planner saw — and
+//! answering it needs the accessibility tree and the pixels, which only the daemon has. So this type
+//! checks time and display; the daemon compares what is under the point, and reports a mismatch as
+//! [`LeaseError::FrameMoved`].
 use serde::{Deserialize, Serialize};
 
 /// The frame an action was planned against, and how long that remains true.
@@ -15,7 +25,7 @@ use serde::{Deserialize, Serialize};
 pub struct Lease {
     /// A hash of the frame the planner saw. Cheap and content-derived — the daemon does not keep the
     /// frame itself, because holding screenshots to validate screenshots is how a redaction promise
-    /// gets broken.
+    /// gets broken. It keeps a small summary per recent frame, and this names which one.
     pub frame: u64,
     /// Unix milliseconds after which this plan is stale regardless of the screen.
     pub expires_at_ms: i64,
@@ -29,7 +39,8 @@ pub struct Lease {
 pub enum LeaseError {
     /// The clock ran out. The planner is answering about a screen that is seconds old.
     Expired { by_ms: i64 },
-    /// The screen changed under the plan.
+    /// What is at the action's point is not what the planner saw there. `planned` and `now` are the
+    /// daemon's identities for it — an element, or a patch of pixels where there is no tree.
     FrameMoved { planned: u64, now: u64 },
     /// The plan was for another display.
     WrongDisplay { planned: u8, now: u8 },
@@ -57,17 +68,15 @@ impl Lease {
         Self { frame, expires_at_ms, display }
     }
 
-    /// May this action still be executed? `now_ms`, `frame` and `display` are what the daemon sees
-    /// at the instant of execution — not what it saw when it asked.
-    pub fn check(&self, now_ms: i64, frame: u64, display: u8) -> Result<(), LeaseError> {
+    /// Is this plan still in date, and for this display? `now_ms` and `display` are what the daemon
+    /// sees at the instant of execution — not what it saw when it asked. Whether the screen still
+    /// matches is the daemon's half of the check (see the module docs).
+    pub fn check(&self, now_ms: i64, display: u8) -> Result<(), LeaseError> {
         if now_ms > self.expires_at_ms {
             return Err(LeaseError::Expired { by_ms: now_ms - self.expires_at_ms });
         }
         if display != self.display {
             return Err(LeaseError::WrongDisplay { planned: self.display, now: display });
-        }
-        if frame != self.frame {
-            return Err(LeaseError::FrameMoved { planned: self.frame, now: frame });
         }
         Ok(())
     }
@@ -78,14 +87,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_plan_for_a_screen_that_has_since_moved_is_refused() {
-        let lease = Lease::new(0xABCD, 0, 10_000);
-        assert_eq!(
-            lease.check(9_000, 0x1234, 0),
-            Err(LeaseError::FrameMoved { planned: 0xABCD, now: 0x1234 })
-        );
-        // The same plan against the frame it was made for is fine.
-        assert!(lease.check(9_000, 0xABCD, 0).is_ok());
+    fn a_plan_in_date_for_this_display_passes_the_time_check() {
+        assert!(Lease::new(0xABCD, 0, 10_000).check(9_000, 0).is_ok());
     }
 
     #[test]
@@ -93,14 +96,14 @@ mod tests {
         // A screen that has not moved is not proof the plan is current: a modal may have opened and
         // closed again between the capture and the answer.
         let lease = Lease::new(1, 0, 10_000);
-        assert_eq!(lease.check(10_400, 1, 0), Err(LeaseError::Expired { by_ms: 400 }));
+        assert_eq!(lease.check(10_400, 0), Err(LeaseError::Expired { by_ms: 400 }));
     }
 
     #[test]
     fn a_plan_for_the_other_monitor_is_refused_before_it_is_compared() {
         let lease = Lease::new(1, 0, 10_000);
         assert_eq!(
-            lease.check(5_000, 1, 1),
+            lease.check(5_000, 1),
             Err(LeaseError::WrongDisplay { planned: 0, now: 1 })
         );
     }

@@ -15,6 +15,7 @@ crates/orbit-core/     the vocabulary every other piece speaks
   lease.rs             what an action was planned against, and when that stops being true
 crates/orbit-daemon/   the trust boundary, as rules with no machine attached
   redact.rs            what may leave the machine: masked, downscaled, fingerprinted — or nothing
+  scene.rs             what each released frame is remembered as: the elements on it, hashed tiles
   validate.rs          what may reach it: app, lease, then consequence; irreversible waits for a human
   guard.rs             when to let go: a hand on the mouse, Escape, 300ms of silence
 apps/overlay/ui/       the dot, the card, and a scripted session to design against
@@ -30,7 +31,7 @@ expires — are testable with no machine to drive, and they are the rules everyt
 **The core:**
 
 ```sh
-cargo test          # 38 tests; one asserts the schema cannot express a shell command, another that
+cargo test          # 49 tests; one asserts the schema cannot express a shell command, another that
                     # a password field leaves the machine black
 ```
 
@@ -51,8 +52,10 @@ instructions. The client cannot run a command because there is no way to express
 that might be bypassed, an absence. Adding a capability here means arguing it against an attacker who
 controls the screen.
 
-**Every action carries a lease.** It names the frame it was planned against and expires. If the
-screen moved while the model was thinking, the action is refused and re-planned. A refusal costs one
+**Every action carries a lease.** It names the frame it was planned against and expires. If what is
+at the action's point changed while the model was thinking — the topmost element under a click, the
+focused field for typing — the action is refused and re-planned. Not the whole screen: a caret blinks
+twice a second, and a lease that demanded a still screen would refuse nearly everything. A refusal costs one
 round trip; a mis-click costs whatever was under the cursor.
 
 **The history is the product, not a debug view.** Something else is moving your mouse. The only thing

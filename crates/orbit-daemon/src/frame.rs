@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A rectangle in device pixels of the frame it came with.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Rect {
     pub x: u32,
     pub y: u32,
@@ -31,12 +31,20 @@ impl Rect {
     }
 }
 
-/// One node of the accessibility tree, reduced to what redaction needs.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// One node of the accessibility tree, reduced to what redaction and the lease need.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Element {
     /// Platform-neutral role. The driver maps AXSecureTextField, UIA `IsPassword`, and AT-SPI
     /// `password text` all to `"secure_text_field"`.
     pub role: String,
+    /// The element's own name — AXTitle or AXDescription, UIA `Name`. Never a placeholder, which
+    /// vanishes on the first keystroke, and never a text field's contents.
+    pub label: String,
+    /// What a click would change, where there is such a thing: "checked", "unchecked", "selected",
+    /// "expanded". `None` for text, whose value changing is the point of typing into it.
+    pub state: Option<String>,
+    /// Holds keyboard focus. At most one element per capture.
+    pub focused: bool,
     pub rect: Rect,
 }
 
@@ -132,24 +140,49 @@ pub struct Capture {
     pub frame: Frame,
     /// The frontmost application, as the platform names it (bundle id, executable name).
     pub app: String,
+    /// In PAINT ORDER, back to front: a pre-order walk of the tree, so a child follows its parent
+    /// and a later sibling or window is drawn over an earlier one. The lease relies on this to know
+    /// what is on top at a point.
     pub elements: Vec<Element>,
     /// `None` when OCR did not run or did not finish. Not the same as "found no text", and the
     /// redactor treats it as a reason to withhold rather than a frame with nothing to hide.
     pub text: Option<Vec<TextSpan>>,
 }
 
-/// FNV-1a over dimensions and pixels: the identity a lease names. Content-derived, so the daemon
-/// can validate a lease without keeping the frame the planner saw.
-pub(crate) fn fingerprint(f: &Frame) -> u64 {
-    const OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
-    const PRIME: u64 = 0x0000_0100_0000_01b3;
-    let mut h = OFFSET;
-    let header = [f.width.to_le_bytes(), f.height.to_le_bytes()];
-    for b in header.iter().flatten().chain([f.display].iter()).chain(f.rgba.iter()) {
-        h ^= *b as u64;
-        h = h.wrapping_mul(PRIME);
+/// FNV-1a. Not cryptographic and does not need to be: it tells frames and elements apart on one
+/// machine, and nobody chooses the inputs to collide.
+#[derive(Clone)]
+pub(crate) struct Fnv(u64);
+
+impl Fnv {
+    pub(crate) fn new() -> Self {
+        Self(0xcbf2_9ce4_8422_2325)
     }
-    h
+    pub(crate) fn write(&mut self, bytes: &[u8]) -> &mut Self {
+        for b in bytes {
+            self.0 ^= *b as u64;
+            self.0 = self.0.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        self
+    }
+    /// A string, terminated, so "ab"+"c" and "a"+"bc" differ.
+    pub(crate) fn text(&mut self, s: &str) -> &mut Self {
+        self.write(s.as_bytes()).write(&[0xff])
+    }
+    pub(crate) fn finish(&self) -> u64 {
+        self.0
+    }
+}
+
+/// The identity a lease names: dimensions and pixels of the released frame. Content-derived, so
+/// the daemon can name a frame without keeping it.
+pub(crate) fn fingerprint(f: &Frame) -> u64 {
+    Fnv::new()
+        .write(&f.width.to_le_bytes())
+        .write(&f.height.to_le_bytes())
+        .write(&[f.display])
+        .write(&f.rgba)
+        .finish()
 }
 
 #[cfg(test)]

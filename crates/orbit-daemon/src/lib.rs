@@ -5,8 +5,8 @@
 //! - **Out:** a capture becomes a [`Released`] frame only through the [`Redactor`] — masked at
 //!   native resolution, downscaled, fingerprinted — or becomes nothing, with a reason.
 //! - **In:** an action reaches the driver only if the [`Guard`] says the operator has not taken over
-//!   and the [`Policy`] says it is in an allowed app, on the screen it was planned for, and either
-//!   reversible or confirmed by a human.
+//!   and the [`Policy`] says it is in an allowed app, still in date, aimed at the same thing it was
+//!   planned against (see [`scene`]), and either reversible or confirmed by a human.
 //!
 //! Like `orbit-core`, it does no I/O. The platform drivers hand it pixels, accessibility rectangles,
 //! OCR spans and human input events; it hands back frames, verdicts, and lists of keys to release.
@@ -14,9 +14,11 @@
 pub mod frame;
 pub mod guard;
 pub mod redact;
+pub mod scene;
 pub mod validate;
 
 pub use frame::{Capture, Element, Frame, Rect, TextSpan};
 pub use guard::{Guard, Halt, Human, Input, Stop};
 pub use redact::{CardNumbers, Detector, Redactor, Released, SecureFields, Withheld};
+pub use scene::{Recent, Scene};
 pub use validate::{Observed, Policy, Verdict};

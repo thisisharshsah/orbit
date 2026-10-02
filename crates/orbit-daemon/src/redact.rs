@@ -10,6 +10,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::frame::{fingerprint, Capture, Frame, Rect};
+use crate::scene::Scene;
 
 /// Finds rectangles that must not leave the machine.
 pub trait Detector {
@@ -104,14 +105,18 @@ impl Withheld {
 #[derive(Debug)]
 pub struct Released {
     frame: Frame,
-    fingerprint: u64,
+    scene: Scene,
     masked: usize,
 }
 
 impl Released {
     /// What the lease for any action planned against this frame must name.
     pub fn fingerprint(&self) -> u64 {
-        self.fingerprint
+        self.scene.fingerprint()
+    }
+    /// What the daemon keeps of this frame to check leases against it later. Not the pixels.
+    pub fn scene(&self) -> &Scene {
+        &self.scene
     }
     pub fn display(&self) -> u8 {
         self.frame.display
@@ -184,8 +189,10 @@ impl Redactor {
         for r in &regions {
             frame.fill_black(r.padded(self.pad, frame.width, frame.height));
         }
+        let (native_w, native_h) = (frame.width, frame.height);
         let frame = frame.fit(self.max.0, self.max.1);
-        Ok(Released { fingerprint: fingerprint(&frame), masked: regions.len(), frame })
+        let scene = Scene::new(fingerprint(&frame), &capture.elements, native_w, native_h, &frame);
+        Ok(Released { frame, scene, masked: regions.len() })
     }
 }
 
@@ -200,7 +207,7 @@ mod tests {
 
     #[test]
     fn a_password_field_leaves_the_machine_black() {
-        let field = Element { role: "secure_text_field".into(), rect: Rect::new(20, 40, 100, 20) };
+        let field = Element { role: "secure_text_field".into(), rect: Rect::new(20, 40, 100, 20), ..Default::default() };
         let r = Redactor::default().release(capture("com.apple.Safari", vec![field], Some(vec![]))).unwrap();
         assert_eq!(r.masked(), 1);
         assert_eq!(r.pixel(70, 50), [0, 0, 0, 255], "inside the field");
@@ -240,7 +247,7 @@ mod tests {
     fn the_fingerprint_is_of_what_the_planner_sees() {
         // Two captures that differ only inside a password field release the same frame, so typing
         // into the field does not invalidate a plan that was made while it was empty.
-        let field = Element { role: "secure_text_field".into(), rect: Rect::new(20, 40, 100, 20) };
+        let field = Element { role: "secure_text_field".into(), rect: Rect::new(20, 40, 100, 20), ..Default::default() };
         let a = capture("app", vec![field.clone()], Some(vec![]));
         let mut b = capture("app", vec![field], Some(vec![]));
         b.frame.rgba[(45 * 200 + 30) * 4] = 7; // a character appears in the field
