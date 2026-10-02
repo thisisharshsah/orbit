@@ -101,11 +101,7 @@ impl Activity {
             consequence: action.consequence(),
             outcome: Outcome::Running,
         });
-        if self.entries.len() > self.cap {
-            let over = self.entries.len() - self.cap;
-            self.entries.drain(0..over);
-            self.dropped += over as u64;
-        }
+        self.trim();
         seq
     }
 
@@ -133,7 +129,18 @@ impl Activity {
             consequence: Consequence::None,
             outcome: Outcome::Done { note: None },
         });
+        self.trim();
         seq
+    }
+
+    /// Notes count against the cap like any other line: a session that narrates more than it acts
+    /// is still a session that must not grow without bound.
+    fn trim(&mut self) {
+        if self.entries.len() > self.cap {
+            let over = self.entries.len() - self.cap;
+            self.entries.drain(0..over);
+            self.dropped += over as u64;
+        }
     }
 
     pub fn entries(&self) -> &[Entry] {
@@ -233,5 +240,15 @@ mod tests {
         a.note("Heard: “find the weather in Tokyo”", 1);
         assert!(!a.is_working());
         assert_eq!(a.tail(1)[0].consequence, Consequence::None);
+    }
+
+    #[test]
+    fn notes_are_bounded_too() {
+        let mut a = Activity::with_cap(2);
+        for i in 0..5 {
+            a.note(format!("heard {i}"), i);
+        }
+        assert_eq!(a.entries().len(), 2);
+        assert_eq!(a.dropped(), 3);
     }
 }
