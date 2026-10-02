@@ -11,12 +11,14 @@
 //! Like `orbit-core`, it does no I/O. The platform drivers hand it pixels, accessibility rectangles,
 //! OCR spans and human input events; it hands back frames, verdicts, and lists of keys to release.
 //! That keeps the boundary testable on any machine, and keeps every platform behind the same rules.
+pub mod access;
 pub mod frame;
 pub mod guard;
 pub mod redact;
 pub mod scene;
 pub mod validate;
 
+pub use access::{Access, Asked, Permission, Status, Step};
 pub use frame::{Capture, Element, Frame, Rect, TextSpan};
 pub use guard::{Guard, Halt, Human, Input, Stop};
 pub use redact::{CardNumbers, Detector, Redactor, Released, SecureFields, Withheld};

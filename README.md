@@ -18,6 +18,9 @@ crates/orbit-daemon/   the trust boundary, as rules with no machine attached
   scene.rs             what each released frame is remembered as: the elements on it, hashed tiles
   validate.rs          what may reach it: app, lease, then consequence; irreversible waits for a human
   guard.rs             when to let go: a hand on the mouse, Escape, 300ms of silence
+  access.rs            the permissions it needs and why, asked for one at a time, each prompt once
+crates/orbit-macos/    the macOS driver, starting with permissions
+  bin/orbit-access.rs  reports what is granted; `setup` walks a person through the rest
 apps/overlay/ui/       the dot, the card, and a scripted session to design against
 ```
 
@@ -31,9 +34,20 @@ expires — are testable with no machine to drive, and they are the rules everyt
 **The core:**
 
 ```sh
-cargo test          # 49 tests; one asserts the schema cannot express a shell command, another that
+cargo test          # 53 tests; one asserts the schema cannot express a shell command, another that
                     # a password field leaves the machine black
 ```
+
+**Permissions** (macOS):
+
+```sh
+cargo run -p orbit-macos --bin orbit-access          # what is granted; shows no prompts
+cargo run -p orbit-macos --bin orbit-access setup    # asks for the rest, one at a time
+```
+
+macOS grants these to an app, not a binary — run from a terminal, the grant goes to the terminal
+(or to VS Code). The shipped daemon will be a signed `.app` so the grant is Orbit's own and a fleet
+can pre-approve it by MDM profile.
 
 **The overlay**, in a browser, with a scripted session:
 
@@ -67,7 +81,8 @@ strings are recorded by length, not content, because the agent types passwords.
 
 1. Tauri v2 shell: transparent always-on-top window, click-through while idle, the dot on the
    platform compositor rather than in the webview.
-2. macOS driver first, because it is the machine this is being written on; Windows second. It feeds
+2. macOS driver first (permissions done), because it is the machine this is being written on;
+   Windows second. It feeds
    the daemon: ScreenCaptureKit frames, AXSecureTextField rectangles, Vision OCR spans, CGEvent taps
    that tell human input from the agent's own.
 3. The encoder behind `Released`, and frame diffing so an unchanged screen costs nothing to resend.
