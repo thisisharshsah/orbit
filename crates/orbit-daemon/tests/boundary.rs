@@ -19,7 +19,7 @@ fn login_page(caret: bool, typed: u8, extra: Option<Element>) -> Capture {
         Element { role: "button".into(), label: "Sign in".into(), rect: Rect::new(800, 560, 320, 48), ..Default::default() },
     ];
     elements.extend(extra);
-    Capture { frame: Frame::new(1920, 1080, 0, px).unwrap(), app: "com.apple.Safari".into(), elements, text: Some(vec![]) }
+    Capture { frame: Frame::new(1920, 1080, 0, px).unwrap(), app: "com.apple.Safari".into(), elements: Some(elements), windows: Some(vec![]), text: Some(vec![]) }
 }
 
 fn observe(redactor: &Redactor, capture: Capture, now_ms: i64) -> Observed {

@@ -19,8 +19,8 @@ pub mod scene;
 pub mod validate;
 
 pub use access::{Access, Asked, Permission, Status, Step};
-pub use frame::{Capture, Element, Frame, Rect, TextSpan};
+pub use frame::{Capture, Element, Frame, Rect, TextSpan, Window};
 pub use guard::{Guard, Halt, Human, Input, Stop};
-pub use redact::{CardNumbers, Detector, Redactor, Released, SecureFields, Withheld};
+pub use redact::{CardNumbers, Detector, OtherApps, Redactor, Released, SecureFields, Withheld};
 pub use scene::{Recent, Scene};
 pub use validate::{Observed, Policy, Verdict};

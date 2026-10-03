@@ -29,6 +29,31 @@ impl Rect {
         let y1 = self.y.saturating_add(self.h).saturating_add(by).min(height);
         Rect { x: x0, y: y0, w: x1.saturating_sub(x0), h: y1.saturating_sub(y0) }
     }
+
+    fn right(self) -> u32 {
+        self.x + self.w
+    }
+    fn bottom(self) -> u32 {
+        self.y + self.h
+    }
+
+    /// The parts of `self` not covered by `other`: up to four rectangles, none overlapping.
+    pub fn minus(self, other: Rect) -> Vec<Rect> {
+        let (x0, y0) = (self.x.max(other.x), self.y.max(other.y));
+        let (x1, y1) = (self.right().min(other.right()), self.bottom().min(other.bottom()));
+        if x0 >= x1 || y0 >= y1 {
+            return vec![self];
+        }
+        [
+            Rect::new(self.x, self.y, self.w, y0 - self.y),             // above
+            Rect::new(self.x, y1, self.w, self.bottom() - y1),          // below
+            Rect::new(self.x, y0, x0 - self.x, y1 - y0),                // left
+            Rect::new(x1, y0, self.right() - x1, y1 - y0),              // right
+        ]
+        .into_iter()
+        .filter(|r| r.w > 0 && r.h > 0)
+        .collect()
+    }
 }
 
 /// One node of the accessibility tree, reduced to what redaction and the lease need.
@@ -45,6 +70,14 @@ pub struct Element {
     pub state: Option<String>,
     /// Holds keyboard focus. At most one element per capture.
     pub focused: bool,
+    pub rect: Rect,
+}
+
+/// A window on screen, and whose it is.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Window {
+    /// The owning app, named the same way as [`Capture::app`].
+    pub app: String,
     pub rect: Rect,
 }
 
@@ -140,10 +173,17 @@ pub struct Capture {
     pub frame: Frame,
     /// The frontmost application, as the platform names it (bundle id, executable name).
     pub app: String,
-    /// In PAINT ORDER, back to front: a pre-order walk of the tree, so a child follows its parent
-    /// and a later sibling or window is drawn over an earlier one. The lease relies on this to know
-    /// what is on top at a point.
-    pub elements: Vec<Element>,
+    /// The frontmost app's accessibility tree, in PAINT ORDER, back to front: a pre-order walk, so
+    /// a child follows its parent and a later sibling or window is drawn over an earlier one. The
+    /// lease relies on this to know what is on top at a point.
+    ///
+    /// `None` when the tree could not be read in full — the app did not answer, or the walk ran out
+    /// of budget. A partial tree may be missing the password field, so it is not offered as one.
+    pub elements: Option<Vec<Element>>,
+    /// Every window on screen, back to front. Only the frontmost app's tree is read, so this is how
+    /// the redactor knows which pixels belong to apps nobody looked inside. `None` if the platform
+    /// would not list them.
+    pub windows: Option<Vec<Window>>,
     /// `None` when OCR did not run or did not finish. Not the same as "found no text", and the
     /// redactor treats it as a reason to withhold rather than a frame with nothing to hide.
     pub text: Option<Vec<TextSpan>>,
@@ -200,6 +240,16 @@ mod tests {
         assert!(Frame::new(2, 2, 0, vec![0; 15]).is_none());
         assert!(Frame::new(0, 2, 0, vec![]).is_none());
         assert!(Frame::new(2, 2, 0, vec![0; 16]).is_some());
+    }
+
+    #[test]
+    fn subtracting_a_window_leaves_the_frame_around_it() {
+        let screen = Rect::new(0, 0, 100, 100);
+        let pieces = screen.minus(Rect::new(20, 30, 50, 40));
+        let area: u32 = pieces.iter().map(|r| r.w * r.h).sum();
+        assert_eq!(area, 100 * 100 - 50 * 40);
+        assert_eq!(Rect::new(0, 0, 10, 10).minus(Rect::new(50, 50, 5, 5)), vec![Rect::new(0, 0, 10, 10)]);
+        assert!(Rect::new(10, 10, 5, 5).minus(Rect::new(0, 0, 100, 100)).is_empty());
     }
 
     #[test]

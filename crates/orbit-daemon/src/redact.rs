@@ -9,7 +9,7 @@
 //! exactly what a lease names.
 use serde::{Deserialize, Serialize};
 
-use crate::frame::{fingerprint, Capture, Frame, Rect};
+use crate::frame::{fingerprint, Capture, Frame, Rect, Window};
 use crate::scene::Scene;
 
 /// Finds rectangles that must not leave the machine.
@@ -29,7 +29,50 @@ impl Detector for SecureFields {
         "secure fields"
     }
     fn detect(&self, c: &Capture) -> Result<Vec<Rect>, String> {
-        Ok(c.elements.iter().filter(|e| e.role == "secure_text_field").map(|e| e.rect).collect())
+        let elements = c.elements.as_ref().ok_or("could not read the screen's structure in full")?;
+        Ok(elements.iter().filter(|e| e.role == "secure_text_field").map(|e| e.rect).collect())
+    }
+}
+
+/// Every visible part of every window that does not belong to the frontmost app.
+///
+/// Only the frontmost app's tree is read — walking every app on every frame would cost more than the
+/// planner does — so a password field in a window behind it would never be found. Rather than show
+/// pixels nobody checked, those windows go black. The planner acts in the frontmost app; the rest of
+/// the desk is context it can do without.
+pub struct OtherApps {
+    /// Shown anyway: system chrome the agent needs and that holds nothing of the operator's — the
+    /// menu bar, the Dock. Not Notification Centre, whose banners preview messages.
+    pub allow: Vec<String>,
+}
+
+impl Default for OtherApps {
+    fn default() -> Self {
+        Self { allow: ["com.apple.dock", "WindowServer"].map(String::from).to_vec() }
+    }
+}
+
+impl Detector for OtherApps {
+    fn name(&self) -> &'static str {
+        "other apps"
+    }
+    fn detect(&self, c: &Capture) -> Result<Vec<Rect>, String> {
+        let windows = c.windows.as_ref().ok_or("could not list the windows on screen")?;
+        let shown = |w: &Window| w.app == c.app || self.allow.iter().any(|a| a == &w.app);
+        let mut masked = Vec::new();
+        for (i, w) in windows.iter().enumerate() {
+            if shown(w) {
+                continue;
+            }
+            // What of this window is not under a window that will be shown. Windows above it that
+            // are masked themselves need no subtracting: they are black either way.
+            let mut visible = vec![w.rect];
+            for above in windows[i + 1..].iter().filter(|a| shown(a)) {
+                visible = visible.into_iter().flat_map(|r| r.minus(above.rect)).collect();
+            }
+            masked.extend(visible);
+        }
+        Ok(masked)
     }
 }
 
@@ -149,7 +192,7 @@ pub struct Redactor {
 impl Default for Redactor {
     fn default() -> Self {
         Self {
-            detectors: vec![Box::new(SecureFields), Box::new(CardNumbers)],
+            detectors: vec![Box::new(SecureFields), Box::new(CardNumbers), Box::new(OtherApps::default())],
             withhold_apps: [
                 "com.1password.1password",
                 "com.bitwarden.desktop",
@@ -191,7 +234,8 @@ impl Redactor {
         }
         let (native_w, native_h) = (frame.width, frame.height);
         let frame = frame.fit(self.max.0, self.max.1);
-        let scene = Scene::new(fingerprint(&frame), &capture.elements, native_w, native_h, &frame);
+        let elements = capture.elements.as_deref().unwrap_or_default();
+        let scene = Scene::new(fingerprint(&frame), elements, native_w, native_h, &frame);
         Ok(Released { frame, scene, masked: regions.len() })
     }
 }
@@ -202,7 +246,33 @@ mod tests {
     use crate::frame::{solid, Element, TextSpan};
 
     fn capture(app: &str, elements: Vec<Element>, text: Option<Vec<TextSpan>>) -> Capture {
-        Capture { frame: solid(200, 100, [250, 250, 250, 255]), app: app.into(), elements, text }
+        let frame = solid(200, 100, [250, 250, 250, 255]);
+        Capture { frame, app: app.into(), elements: Some(elements), windows: Some(vec![]), text }
+    }
+
+    #[test]
+    fn a_window_from_another_app_is_black_where_it_shows_and_nowhere_else() {
+        let mut c = capture("com.apple.Safari", vec![], Some(vec![]));
+        c.windows = Some(vec![
+            Window { app: "com.tinyspeck.slackmacgap".into(), rect: Rect::new(0, 0, 120, 100) },
+            Window { app: "com.apple.Safari".into(), rect: Rect::new(60, 0, 140, 100) },
+        ]);
+        let r = Redactor::default().release(c).unwrap();
+        assert_eq!(r.pixel(10, 50), [0, 0, 0, 255], "Slack, where it shows");
+        assert_eq!(r.pixel(100, 50), [250, 250, 250, 255], "Safari, drawn over Slack's right edge");
+    }
+
+    #[test]
+    fn a_partial_tree_or_no_window_list_withholds_the_frame() {
+        let mut c = capture("app", vec![], Some(vec![]));
+        c.elements = None;
+        assert_eq!(
+            Redactor::default().release(c).unwrap_err().narrate(),
+            "Not looking: could not read the screen's structure in full"
+        );
+        let mut c = capture("app", vec![], Some(vec![]));
+        c.windows = None;
+        assert!(Redactor::default().release(c).is_err());
     }
 
     #[test]

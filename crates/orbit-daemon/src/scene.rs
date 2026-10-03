@@ -194,7 +194,8 @@ pub(crate) mod tests {
         let capture = Capture {
             frame: Frame::new(1000, 500, 0, px).unwrap(),
             app: "app".into(),
-            elements,
+            elements: Some(elements),
+            windows: Some(vec![]),
             text: Some(vec![]),
         };
         Redactor::default().release(capture).unwrap().scene().clone()
