@@ -19,13 +19,17 @@ crates/orbit-daemon/   the trust boundary, as rules with no machine attached
   validate.rs          what may reach it: app, lease, then consequence; irreversible waits for a human
   guard.rs             when to let go: a hand on the mouse, Escape, 300ms of silence
   access.rs            the permissions it needs and why, asked for one at a time, each prompt once
-crates/orbit-macos/    the macOS driver, starting with permissions
+crates/orbit-macos/    the macOS driver
+  screen.rs            the display as RGBA, every window on it, and the menu bar and Dock
+  ax.rs                the frontmost app's tree: batched reads, invisible subtrees skipped
+  ocr.rs               on-device text recognition with Vision, for card numbers with no tree
   bin/orbit-access.rs  reports what is granted; `setup` walks a person through the rest
+  bin/orbit-look.rs    one real capture through the redactor, timed, saved as the planner sees it
 apps/overlay/ui/       the dot, the card, and a scripted session to design against
 ```
 
-Nothing here talks to a model, a screen or an operating system yet — the daemon included, which
-takes pixels, accessibility rectangles and OCR spans from a driver that does not exist yet. That is deliberate: the rules
+Nothing here talks to a model yet. The macOS driver reads the screen, the accessibility tree and
+on-device OCR, and the daemon redacts them; nothing is sent anywhere, and nothing moves the mouse. That is deliberate: the rules
 worth getting right — a closed action set, a settled line that cannot be rewritten, a plan that
 expires — are testable with no machine to drive, and they are the rules everything else will lean on.
 
@@ -34,7 +38,7 @@ expires — are testable with no machine to drive, and they are the rules everyt
 **The core:**
 
 ```sh
-cargo test          # 53 tests; one asserts the schema cannot express a shell command, another that
+cargo test          # 56 tests; one asserts the schema cannot express a shell command, another that
                     # a password field leaves the machine black
 ```
 
@@ -43,6 +47,13 @@ cargo test          # 53 tests; one asserts the schema cannot express a shell co
 ```sh
 cargo run -p orbit-macos --bin orbit-access          # what is granted; shows no prompts
 cargo run -p orbit-macos --bin orbit-access setup    # asks for the rest, one at a time
+```
+
+Then see what the planner would be sent — masked, downscaled, with per-stage timings — saved to a
+PNG on this machine and nowhere else:
+
+```sh
+cargo run --release -p orbit-macos --bin orbit-look            # writes orbit-look.png
 ```
 
 macOS grants these to an app, not a binary — run from a terminal, the grant goes to the terminal
@@ -81,8 +92,7 @@ strings are recorded by length, not content, because the agent types passwords.
 
 1. Tauri v2 shell: transparent always-on-top window, click-through while idle, the dot on the
    platform compositor rather than in the webview.
-2. macOS driver first (permissions done), because it is the machine this is being written on;
-   Windows second. It feeds
-   the daemon: ScreenCaptureKit frames, AXSecureTextField rectangles, Vision OCR spans, CGEvent taps
-   that tell human input from the agent's own.
+2. The rest of the macOS driver: CGEvent taps that tell the operator's input from the agent's own
+   (the kill switch), then input synthesis. Capture moves to ScreenCaptureKit before
+   CGDisplayCreateImage is removed. Windows second.
 3. The encoder behind `Released`, and frame diffing so an unchanged screen costs nothing to resend.

@@ -8,3 +8,4 @@ description = "The macOS driver: permissions first; capture, the accessibility t
 [dependencies]
 orbit-daemon = { path = "../orbit-daemon" }
 serde_json = { workspace = true }
+objc2 = "0.6"
