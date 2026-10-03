@@ -6,10 +6,8 @@
 //! is sent anywhere.
 #[cfg(target_os = "macos")]
 fn main() {
-    use std::time::Instant;
-
-    use orbit_daemon::{Access, Capture, Permission, Redactor, Status};
-    use orbit_macos::{ax, ocr, screen, MacAccess};
+    use orbit_daemon::{Access, Permission, Redactor, Status};
+    use orbit_macos::{look, screen, MacAccess};
 
     let out = std::env::args().nth(1).unwrap_or_else(|| "orbit-look.png".into());
     for p in [Permission::ScreenRecording, Permission::Accessibility] {
@@ -18,77 +16,41 @@ fn main() {
             std::process::exit(1);
         }
     }
-
-    let ms = |t: Instant| format!("{:>5.0}ms", t.elapsed().as_secs_f64() * 1000.0);
-    let all = Instant::now();
-
-    let t = Instant::now();
-    let shot = match screen::Shot::capture() {
-        Ok(s) => s,
+    let l = match look::look(&Redactor::default()) {
+        Ok(l) => l,
         Err(e) => {
             eprintln!("{e}");
             std::process::exit(1);
         }
     };
-    println!("{}  capture       {}×{} at {}× scale", ms(t), shot.frame.width, shot.frame.height, shot.scale);
-
-    let t = Instant::now();
-    let windows = shot.windows();
-    match &windows {
-        Some(w) => println!("{}  windows       {} on screen", ms(t), w.len()),
-        None => println!("{}  windows       could not be listed", ms(t)),
-    }
-
-    let t = Instant::now();
-    let tree = match ax::front(&shot, ax::Budget::default()) {
-        Ok(tree) => tree,
-        Err(e) => {
-            eprintln!("{e}");
-            std::process::exit(1);
-        }
-    };
-    match (&tree.elements, &tree.incomplete) {
-        (Some(els), _) => {
-            let secure = els.iter().filter(|e| e.role == "secure_text_field").count();
-            let focus = els.iter().find(|e| e.focused).map(|e| format!(", focus on {} “{}”", e.role, e.label)).unwrap_or_default();
-            println!(
-                "{}  tree          {}: {} elements ({} read, {} hidden subtrees skipped), {} password field(s){focus}",
-                ms(t), tree.app, els.len(), tree.visited, tree.pruned, secure
-            );
-        }
-        (None, why) => println!(
-            "{}  tree          {}: incomplete ({}; {} read, {} skipped)",
-            ms(t), tree.app, why.as_deref().unwrap_or("?"), tree.visited, tree.pruned
+    let (f, t) = (&l.findings, &l.timings);
+    let or = |v: Option<usize>, none: &str| v.map(|n| n.to_string()).unwrap_or_else(|| none.into());
+    println!("{:>5}ms  capture", t.capture);
+    println!("{:>5}ms  windows       {} on screen", t.windows, or(f.windows, "could not be listed"));
+    match &f.tree_incomplete {
+        None => println!(
+            "{:>5}ms  tree          {}: {} elements, {} password field(s){}",
+            t.tree,
+            f.app,
+            or(f.elements, "?"),
+            f.password_fields,
+            f.focus.as_ref().map(|x| format!(", focus on {x}")).unwrap_or_default()
         ),
+        Some(why) => println!("{:>5}ms  tree          {}: incomplete ({why})", t.tree, f.app),
     }
-
-    let t = Instant::now();
-    let text = match ocr::recognise(&shot) {
-        Ok(spans) => {
-            println!("{}  ocr           {} lines of text", ms(t), spans.len());
-            Some(spans)
-        }
-        Err(e) => {
-            println!("{}  ocr           failed: {e}", ms(t));
-            None
-        }
-    };
-
-    let t = Instant::now();
-    let screen::Shot { frame, .. } = shot;
-    let capture = Capture { frame, app: tree.app, elements: tree.elements, windows, text };
-    match Redactor::default().release(capture) {
+    println!("{:>5}ms  ocr           {} lines of text", t.ocr, or(f.text_lines, "failed:"));
+    match &l.outcome {
         Ok(r) => {
             let (w, h) = r.size();
-            println!("{}  redact        {} region(s) blacked out, released at {w}×{h}", ms(t), r.masked());
-            println!("{}  total         frame {:016x}", ms(all), r.fingerprint());
-            match screen::save_png(&r, std::path::Path::new(&out)) {
+            println!("{:>5}ms  redact        {} region(s) blacked out, released at {w}×{h}", t.redact, r.masked());
+            println!("{:>5}ms  total         frame {:016x}", t.total, r.fingerprint());
+            match screen::save_png(r, std::path::Path::new(&out)) {
                 Ok(()) => println!("\nWhat the planner would see: {out}"),
                 Err(e) => eprintln!("could not save: {e}"),
             }
         }
         Err(w) => {
-            println!("{}  redact        withheld — {}", ms(t), w.narrate());
+            println!("{:>5}ms  redact        withheld — {}", t.redact, w.narrate());
             std::process::exit(3);
         }
     }

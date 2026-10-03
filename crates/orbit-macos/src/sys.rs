@@ -76,6 +76,14 @@ unsafe extern "C" {
     pub fn CFURLCreateFromFileSystemRepresentation(a: CFTypeRef, buf: *const u8, len: CFIndex, dir: u8) -> CFTypeRef;
     pub fn CFBundleCreate(a: CFTypeRef, url: CFTypeRef) -> CFTypeRef;
     pub fn CFBundleGetIdentifier(b: CFTypeRef) -> CFTypeRef;
+    pub static kCFRunLoopCommonModes: CFTypeRef;
+    pub fn CFMachPortCreateRunLoopSource(a: CFTypeRef, port: CFTypeRef, order: CFIndex) -> CFTypeRef;
+    pub fn CFRunLoopGetCurrent() -> CFTypeRef;
+    pub fn CFRunLoopAddSource(rl: CFTypeRef, source: CFTypeRef, mode: CFTypeRef);
+    pub fn CFRunLoopRun();
+    pub fn CFDataCreateMutable(a: CFTypeRef, capacity: CFIndex) -> CFTypeRef;
+    pub fn CFDataGetLength(d: CFTypeRef) -> CFIndex;
+    pub fn CFDataGetBytePtr(d: CFTypeRef) -> *const u8;
 }
 
 #[link(name = "CoreGraphics", kind = "framework")]
@@ -106,7 +114,38 @@ unsafe extern "C" {
     pub fn CGContextDrawImage(ctx: CFTypeRef, rect: CGRect, img: CFTypeRef);
     pub fn CGWindowListCopyWindowInfo(option: u32, relative_to: u32) -> CFTypeRef;
     pub fn CGRectMakeWithDictionaryRepresentation(dict: CFTypeRef, rect: *mut CGRect) -> bool;
+    pub fn CGEventTapCreate(
+        tap: u32,
+        place: u32,
+        options: u32,
+        events: u64,
+        callback: EventTapCallback,
+        user: *mut c_void,
+    ) -> CFTypeRef;
+    pub fn CGEventTapEnable(tap: CFTypeRef, enable: bool);
+    pub fn CGEventGetLocation(event: CFTypeRef) -> CGPoint;
+    pub fn CGEventGetIntegerValueField(event: CFTypeRef, field: u32) -> i64;
 }
+
+pub type EventTapCallback = extern "C" fn(proxy: *mut c_void, kind: u32, event: CFTypeRef, user: *mut c_void) -> CFTypeRef;
+
+pub const kCGSessionEventTap: u32 = 1;
+pub const kCGHeadInsertEventTap: u32 = 0;
+pub const kCGEventTapOptionListenOnly: u32 = 1;
+pub const kCGEventLeftMouseDown: u32 = 1;
+pub const kCGEventRightMouseDown: u32 = 3;
+pub const kCGEventMouseMoved: u32 = 5;
+pub const kCGEventLeftMouseDragged: u32 = 6;
+pub const kCGEventRightMouseDragged: u32 = 7;
+pub const kCGEventKeyDown: u32 = 10;
+pub const kCGEventOtherMouseDragged: u32 = 27;
+pub const kCGEventTapDisabledByTimeout: u32 = 0xFFFF_FFFE;
+pub const kCGEventTapDisabledByUserInput: u32 = 0xFFFF_FFFF;
+pub const kCGKeyboardEventKeycode: u32 = 9;
+pub const kCGEventSourceStateID: u32 = 45;
+/// The source state of events that came from hardware.
+pub const kCGEventSourceStateHIDSystemState: i64 = 1;
+pub const KEY_ESCAPE: i64 = 53;
 
 #[link(name = "ApplicationServices", kind = "framework")]
 unsafe extern "C" {
@@ -132,6 +171,7 @@ unsafe extern "C" {
 
 #[link(name = "ImageIO", kind = "framework")]
 unsafe extern "C" {
+    pub fn CGImageDestinationCreateWithData(data: CFTypeRef, kind: CFTypeRef, count: usize, options: CFTypeRef) -> CFTypeRef;
     pub fn CGImageDestinationCreateWithURL(url: CFTypeRef, kind: CFTypeRef, count: usize, options: CFTypeRef) -> CFTypeRef;
     pub fn CGImageDestinationAddImage(dest: CFTypeRef, img: CFTypeRef, props: CFTypeRef);
     pub fn CGImageDestinationFinalize(dest: CFTypeRef) -> bool;

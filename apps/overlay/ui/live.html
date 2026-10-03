@@ -1,0 +1,159 @@
+<!doctype html>
+<!--
+  THE LIVE VIEW — served by `orbit-watch`, not by a static server.
+
+  The middle of the page is what the AI would be sent, refreshed every second: the real screen,
+  captured, masked and shrunk on this Mac. Black is what never leaves it. The card in the corner is
+  the real overlay (overlay.js, unchanged), fed by the daemon's real activity log instead of the
+  scripted demo — so this page is the first place the dot, the redactor and the kill switch run
+  together on a real machine.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Orbit Live</title>
+    <link rel="stylesheet" href="overlay.css" />
+    <style>
+      body {
+        background: var(--ground);
+        color: var(--ink);
+        margin: 0;
+        padding: 20px 16px 140px;
+        box-sizing: border-box;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+      }
+      h1 {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 0 0 4px;
+      }
+      .lede {
+        color: var(--mute);
+        font-size: 14px;
+        margin: 0 0 16px;
+        line-height: 1.45;
+      }
+      figure {
+        margin: 0;
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+        background: #000;
+        aspect-ratio: 16 / 10;
+        display: grid;
+        place-items: center;
+      }
+      figure img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+      }
+      figure .withheld {
+        color: #f2f4f8;
+        font-size: 15px;
+        padding: 24px;
+        text-align: center;
+      }
+      .row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin: 14px 0 0;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 8px;
+        margin-top: 14px;
+      }
+      .stat {
+        border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent);
+        border-radius: 8px;
+        padding: 8px 10px;
+        min-width: 0;
+      }
+      .stat b {
+        display: block;
+        font-size: 18px;
+        font-variant-numeric: tabular-nums;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .stat span {
+        color: var(--mute);
+        font-size: 12px;
+      }
+      button.go {
+        font: inherit;
+        font-size: 15px;
+        font-weight: 600;
+        padding: 10px 16px;
+        border-radius: 8px;
+        border: 0;
+        background: #3b6cf6;
+        color: white;
+        cursor: pointer;
+      }
+      button.go:disabled {
+        opacity: 0.5;
+        cursor: default;
+      }
+      #status {
+        color: var(--mute);
+        font-size: 14px;
+      }
+      #status.big {
+        color: var(--ink);
+        font-size: 20px;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>What Orbit would send to the AI</h1>
+      <p class="lede">
+        Your main screen, live, after masking. <b>Black never leaves this Mac:</b> password fields, card
+        numbers, and every app except the one in front. Click into another app, such as a sign-in page, and
+        watch it update.
+      </p>
+      <figure id="view"><img id="frame" alt="The screen as the AI would see it" /></figure>
+      <div class="stats" id="stats"></div>
+      <div class="row">
+        <button class="go" id="work" type="button">Let Orbit work for 20 seconds</button>
+        <span id="status">Then take your hand off the mouse. Touch it, or press Escape, to stop Orbit.</span>
+      </div>
+    </main>
+
+    <!-- The real overlay, unchanged. -->
+    <div id="stage">
+      <div id="orbit" data-state="idle" aria-live="polite">
+        <div id="dot" role="button" tabindex="0" aria-label="Orbit — click to open the activity card">
+          <span id="pulse"></span>
+        </div>
+        <section id="card" aria-label="What Orbit is doing">
+          <header>
+            <span id="badge">working</span>
+            <h1 id="headline">Looking at the screen</h1>
+            <button id="stop" type="button" title="Stop — releases the mouse and keyboard at once">Stop</button>
+          </header>
+          <ol id="history" aria-label="Activity history"></ol>
+          <footer>
+            <span id="earlier"></span>
+            <span id="hint">Esc, or move the mouse, to take back control</span>
+          </footer>
+        </section>
+      </div>
+    </div>
+
+    <script type="module" src="overlay.js"></script>
+    <script type="module" src="live.js"></script>
+  </body>
+</html>

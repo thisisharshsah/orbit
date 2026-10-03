@@ -6,6 +6,8 @@ license.workspace = true
 description = "The macOS driver: permissions first; capture, the accessibility tree and input to follow."
 
 [dependencies]
+orbit-core = { path = "../orbit-core" }
 orbit-daemon = { path = "../orbit-daemon" }
+serde = { workspace = true }
 serde_json = { workspace = true }
 objc2 = "0.6"

@@ -51,7 +51,9 @@ name = "orbit-macos"
 version = "0.0.0"
 dependencies = [
  "objc2",
+ "orbit-core",
  "orbit-daemon",
+ "serde",
  "serde_json",
 ]
 

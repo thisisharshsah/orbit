@@ -19,6 +19,8 @@
 
 pub mod access;
 pub mod ax;
+pub mod input;
+pub mod look;
 pub mod ocr;
 pub mod screen;
 pub mod sys;

@@ -24,7 +24,11 @@ crates/orbit-macos/    the macOS driver
   ax.rs                the frontmost app's tree: batched reads, invisible subtrees skipped
   ocr.rs               on-device text recognition with Vision, for card numbers with no tree
   bin/orbit-access.rs  reports what is granted; `setup` walks a person through the rest
-  bin/orbit-look.rs    one real capture through the redactor, timed, saved as the planner sees it
+  input.rs             a listen-only tap on the operator's real keyboard and mouse, for the kill switch
+  look.rs              one look: capture → windows → tree → OCR → redact, timed
+  bin/orbit-look.rs    one look, saved as a PNG
+  bin/orbit-watch.rs   Orbit live in your browser: the masked screen, the real card, the kill switch
+apps/overlay/ui/live.* the overlay fed by orbit-watch instead of the scripted demo
 apps/overlay/ui/       the dot, the card, and a scripted session to design against
 ```
 
@@ -34,6 +38,17 @@ worth getting right — a closed action set, a settled line that cannot be rewri
 expires — are testable with no machine to drive, and they are the rules everything else will lean on.
 
 ## Run it
+
+**See it work** (macOS) — the quickest way to understand what exists:
+
+```sh
+cargo run --release -p orbit-macos --bin orbit-watch
+```
+
+A page opens showing your main screen as the AI would receive it, refreshed every second; black never
+leaves the Mac. Click into a sign-in page and watch the password box go black. Press **Let Orbit work
+for 20 seconds**, take your hand off the mouse, and watch the card fill; touch the mouse or press
+Escape and it stops at once, saying why.
 
 **The core:**
 

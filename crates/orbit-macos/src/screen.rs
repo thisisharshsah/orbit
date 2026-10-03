@@ -133,25 +133,32 @@ impl Shot {
     }
 }
 
-/// Write a released frame as a PNG — the redacted, downscaled pixels the planner would see, and
-/// nothing else. For a person to check the mask with their own eyes; never sent anywhere.
-pub fn save_png(released: &orbit_daemon::Released, path: &std::path::Path) -> Result<(), String> {
+/// A released frame as PNG bytes — the redacted, downscaled pixels the planner would see, and
+/// nothing else. For a person to check the mask with their own eyes; never sent off this machine.
+pub fn encode_png(released: &orbit_daemon::Released) -> Result<Vec<u8>, String> {
     let (w, h) = released.size();
     let mut buf = released.rgba().to_vec();
-    let path = path.to_str().ok_or("the path is not UTF-8")?;
-    // SAFETY: the context draws from `buf`, which outlives it; every object is an owned Cf.
+    // SAFETY: the context draws from `buf`, which outlives it; every object is an owned Cf, and the
+    // output bytes are copied out while the CFData is still held.
     unsafe {
         let space = Cf::own(CGColorSpaceCreateDeviceRGB()).ok_or("no RGB colour space")?;
         let ctx = Cf::own(CGBitmapContextCreate(buf.as_mut_ptr().cast(), w as usize, h as usize, 8, w as usize * 4, space.ptr(), RGBA_BITMAP_INFO))
             .ok_or("could not create a bitmap context")?;
         let image = Cf::own(CGBitmapContextCreateImage(ctx.ptr())).ok_or("could not make an image")?;
-        let url = cfurl(path, true).ok_or("bad path")?;
-        let dest = Cf::own(CGImageDestinationCreateWithURL(url.ptr(), cfstr("public.png").ptr(), 1, std::ptr::null()))
-            .ok_or("could not open the file for writing")?;
+        let data = Cf::own(CFDataCreateMutable(std::ptr::null(), 0)).ok_or("out of memory")?;
+        let dest = Cf::own(CGImageDestinationCreateWithData(data.ptr(), cfstr("public.png").ptr(), 1, std::ptr::null()))
+            .ok_or("could not start a PNG")?;
         CGImageDestinationAddImage(dest.ptr(), image.ptr(), std::ptr::null());
         if !CGImageDestinationFinalize(dest.ptr()) {
-            return Err("could not write the PNG".into());
+            return Err("could not encode the PNG".into());
         }
+        drop(dest);
+        let len = CFDataGetLength(data.ptr()) as usize;
+        Ok(std::slice::from_raw_parts(CFDataGetBytePtr(data.ptr()), len).to_vec())
     }
-    Ok(())
+}
+
+/// [`encode_png`], to a file on this machine.
+pub fn save_png(released: &orbit_daemon::Released, path: &std::path::Path) -> Result<(), String> {
+    std::fs::write(path, encode_png(released)?).map_err(|e| e.to_string())
 }
